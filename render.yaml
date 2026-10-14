@@ -1,12 +1,6 @@
 # Render Blueprint — Rafiq prototype (synthetic data only)
-databases:
-  - name: rafiq-db
-    plan: 0.1c-256mb      # smallest paid Postgres (persistent; the free plan expires)
-    region: frankfurt     # same region as the web service
-    postgresMajorVersion: "16"
-    databaseName: rafiq
-    user: rafiq
-    ipAllowList: []       # private network only: not reachable from the internet
+# Database: Render Postgres "rafiq-db" (Frankfurt, private network only) is created in the dashboard,
+# and its Internal Database URL is set on the web service as DATABASE_URL (never committed).
 
 services:
   - type: web
@@ -38,6 +32,4 @@ services:
         generateValue: true
       # Runtime state (requests, cases, consent, audit, conversations) in Postgres over the private network
       - key: DATABASE_URL
-        fromDatabase:
-          name: rafiq-db
-          property: connectionString
+        sync: false       # Internal Database URL of rafiq-db, set in the Render dashboard
