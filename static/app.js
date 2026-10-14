@@ -313,19 +313,30 @@ function homeRoute(j) {
       <div class="jprog-meter"><span class="meter"><span style="width:${Math.round(done / total * 100)}%"></span></span>
         <span class="small muted">${L(`${done} done · ${total - done} to go`, `${done} مكتملة · ${total - done} متبقية`)}</span></div>
     </div>
-    ${S.homeStyle === "window" ? `<div class="win-wrap"><span class="win-cap" id="capL"></span><div class="snake win" id="homeSnake"></div><span class="win-cap" id="capR"></span></div>
-      <p class="win-foot"><button class="linkbtn" data-go="journey">${L("View the full route", "عرض المسار كاملاً")} →</button></p>` : `<div class="snake compact" id="homeSnake"></div>`}
+    ${S.homeStyle === "window" ? `<div class="strip">
+        <button class="strip-btn prev" id="stripPrev" aria-label="${L("Earlier steps", "الخطوات السابقة")}">‹</button>
+        <div class="strip-scroll" id="stripScroll" tabindex="0" aria-label="${L("Your journey steps. Scroll to see earlier and later steps.", "خطوات رحلتك. مرّر لرؤية الخطوات السابقة واللاحقة.")}"><div class="snake strip-snake" id="homeSnake"></div></div>
+        <button class="strip-btn next" id="stripNext" aria-label="${L("Later steps", "الخطوات اللاحقة")}">›</button>
+      </div>` : `<div class="snake compact" id="homeSnake"></div>`}
   </section>`;
 }
 function drawHomeRoute(j) {
-  const ar = S.lang === "ar"; const L = (en, a) => (ar ? a : en);
   if (S.homeStyle !== "window") return drawSnake(j, { box: "#homeSnake" });
-  const n = j.ordered.length; const k = j.current ? j.current.n - 1 : n - 1;
-  const w = $("#homeSnake").clientWidth; const size = w > 820 ? 5 : w > 560 ? 4 : 3;
-  let a = Math.max(0, k - 1); const b = Math.min(n, a + size); a = Math.max(0, b - size);
-  drawSnake(j, { box: "#homeSnake", steps: j.ordered.slice(a, b), cols: size });
-  $("#capL").innerHTML = a ? `<span class="cap-n">${a}</span>${L("earlier", "سابقة")}` : "";
-  $("#capR").innerHTML = n - b ? `<span class="cap-n">${n - b}</span>${L("more", "أخرى")}` : "";
+  // One scrollable strip of every step, opened centred on "You are here"
+  drawSnake(j, { box: "#homeSnake", steps: j.ordered, cols: j.ordered.length });
+  const sc = $("#stripScroll"); const here = sc.querySelector(".sn.here") || sc.querySelector(".sn:last-child");
+  if (here) sc.scrollLeft += (here.getBoundingClientRect().left + here.offsetWidth / 2) - (sc.getBoundingClientRect().left + sc.clientWidth / 2);
+  const step = () => (sc.querySelector(".sn")?.offsetWidth || 180) * 2;
+  const upd = () => {
+    const max = sc.scrollWidth - sc.clientWidth; const x = Math.abs(sc.scrollLeft);
+    $("#stripPrev").disabled = x <= 2;          // at the start (earliest steps) in either direction
+    $("#stripNext").disabled = x >= max - 2;
+    sc.classList.toggle("fade-l", !$("#stripPrev").disabled); sc.classList.toggle("fade-r", !$("#stripNext").disabled);
+  };
+  const dir = S.lang === "ar" ? -1 : 1;  // earlier steps sit on the right in Arabic
+  $("#stripPrev").onclick = () => sc.scrollBy({ left: -step() * dir, behavior: "smooth" });
+  $("#stripNext").onclick = () => sc.scrollBy({ left: step() * dir, behavior: "smooth" });
+  sc.onscroll = upd; upd();
 }
 
 async function renderEmployeeHome() {
@@ -373,7 +384,7 @@ async function renderEmployeeHome() {
   </div>`;
   bindRibbon();
   if (S.homeStyle) drawHomeRoute(j);
-  if (!S._homeResize) { S._homeResize = true; window.addEventListener("resize", () => { if (S.page === "home" && S.journey && $("#homeSnake")) drawHomeRoute(S.journey); }); }
+
   document.querySelectorAll("[data-go]").forEach((b) => b.onclick = () => go(b.dataset.go));
   document.querySelectorAll("[data-ask]").forEach((b) => b.onclick = () => go("chat", { ask: (ar ? "ما وضع " : "What's the status of ") + b.dataset.ask + "?" }));
   document.querySelectorAll("[data-qa]").forEach((b) => b.onclick = () => {
