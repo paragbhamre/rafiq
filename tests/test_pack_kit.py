@@ -16,7 +16,9 @@ from app import config
 from app.data import pack
 
 ROOT = Path(__file__).resolve().parent.parent
-pytestmark = pytest.mark.skipif(not config.IS_REFERENCE_PACK, reason="builds packs from the synthetic pack")
+# "slow": builds whole packs and re-runs the suite in subprocesses. Run before every push
+# (python -m pytest -q); skipped in the Render build to keep deploys to a few minutes.
+pytestmark = [pytest.mark.skipif(not config.IS_REFERENCE_PACK, reason="builds packs from the synthetic pack"), pytest.mark.slow]
 
 
 def _run(*args, env=None):

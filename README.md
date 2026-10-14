@@ -37,7 +37,8 @@ docker run -p 8000:8000 --env-file .env rafiq
 ```bash
 pip install -r requirements.txt
 uvicorn app.main:app --port 8000
-python -m pytest -q          # 63 tests: scenarios, privacy, guardrails, sign-in security, persistence, pack swap kit
+python -m pytest -q          # all 65 tests, including the pack swap rehearsal (run before every push)
+python -m pytest -q -m "not slow"   # the 57 the Render build runs (a few seconds)
 DATABASE_URL=postgresql://user@host/db python -m pytest -q   # same suite against Postgres
 ```
 

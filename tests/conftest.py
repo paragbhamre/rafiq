@@ -10,3 +10,7 @@ os.environ.setdefault("RAFIQ_RUNTIME_DIR", tempfile.mkdtemp(prefix="rafiq-test-"
 os.environ["LLM_PROVIDER"] = "offline"
 os.environ["RAFIQ_DEMO_PASSWORD"] = "test-demo-pass"
 os.environ["RAFIQ_ADMIN_PASSWORD"] = "test-admin-pass"
+
+
+def pytest_configure(config):
+    config.addinivalue_line("markers", "slow: pack swap rehearsal (subprocesses); excluded from the Render build")
