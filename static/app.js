@@ -126,6 +126,7 @@ async function showLogin() {
   $("#view").innerHTML = `
   <div class="login">
     <section class="login-card panel" aria-labelledby="signinTitle">
+      <div class="login-mark"><svg class="mark mark-lg" viewBox="0 0 120 120" aria-hidden="true" focusable="false"><circle class="mark-ring" cx="60" cy="60" r="54"/><circle class="mark-ring2" cx="60" cy="60" r="48.5"/><path class="mark-r" d="M35 0V10H56Q80 10 96.5 17.0Q113 24 121.5 39.0Q130 54 130 79V638Q130 662 121.5 676.5Q113 691 96.5 697.5Q80 704 56 704H35V714H319Q408 714 466.0 692.5Q524 671 552.5 629.5Q581 588 581 528Q581 471 558.0 433.5Q535 396 499.5 374.5Q464 353 425 341L557 129Q580 93 596.5 69.5Q613 46 626.0 33.0Q639 20 650.0 15.0Q661 10 673 10H676V0H656Q610 0 578.5 3.5Q547 7 525.5 16.5Q504 26 487.0 44.0Q470 62 452 91L305 333H246V79Q246 54 254.5 39.0Q263 24 280.0 17.0Q297 10 320 10H341V0ZM313 343Q365 343 396.5 361.0Q428 379 442.5 418.0Q457 457 457 521Q457 586 442.0 626.5Q427 667 395.0 685.5Q363 704 311 704H246V343Z" transform="translate(34.05 86.06) scale(0.073 -0.073)"/><circle class="mark-dot" cx="98.18" cy="21.82" r="5.2"/></svg></div>
       <h1 id="signinTitle">${L("Sign in", "تسجيل الدخول")}</h1>
       <p class="login-sub">${L("Your onboarding and move, in one place.", "رحلة انضمامك وانتقالك في مكان واحد.")}</p>
       <form id="loginForm" autocomplete="on">

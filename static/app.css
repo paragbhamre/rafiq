@@ -15,7 +15,18 @@ p { margin: 0; }
 
 /* Top bar ---------------------------------------------------------- */
 .top { background: var(--bar-bg); color: var(--bar-ink); display: flex; align-items: center; gap: 24px; padding: 0 28px; min-height: 64px; flex-wrap: wrap; border-bottom: 3px solid var(--bar-rule); }
-.brand { display: flex; align-items: baseline; gap: 10px; }
+.brand { display: flex; align-items: center; gap: 12px; }
+/* Logo: seal monogram (tokens from theme.css) */
+.mark { width: 40px; height: 40px; flex: none; }
+.mark-ring { fill: none; stroke: var(--gold); stroke-width: 4.5; }
+.mark-ring2 { display: none; fill: none; stroke: var(--gold); stroke-width: 1.2; }
+.mark-r { fill: var(--ink); }
+.mark-dot { fill: var(--accent); stroke: var(--surface); stroke-width: 4; r: 9px; }
+.mark-lg { width: 72px; height: 72px; }
+.mark-lg .mark-ring { stroke-width: 2.6; }
+.mark-lg .mark-ring2 { display: inline; }
+.mark-lg .mark-dot { r: 6.5px; stroke-width: 3; }
+.login-mark { margin-bottom: 16px; }
 .brand b { font-family: var(--font-display); font-size: 1.6rem; font-weight: 600; color: var(--bar-ink); }
 .brand .brand-ar { font-family: var(--font-display); color: var(--accent); font-size: 1.15rem; }
 .brand .tagline { color: var(--bar-muted); font-size: .86rem; padding-inline-start: 10px; border-inline-start: 1px solid var(--line); }
