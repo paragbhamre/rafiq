@@ -238,7 +238,8 @@ function addBot(r, scroll = true) {
   const extra = r.citations.filter((c) => !r.reply.includes(c.cite));
   d.innerHTML = `<div class="body" dir="${r.lang === "ar" ? "rtl" : "ltr"}">${md(r.reply)}</div>
     ${r.actions.length ? `<div class="acts">${r.actions.map((a, i) => `<button class="btn ${a.primary ? "primary" : ""}" data-i="${i}">${esc(a.label)}</button>`).join("")}</div>` : ""}
-    ${extra.length ? `<div class="meta">${t("sources")}: ${extra.map((c) => `<button class="cite" data-cite="${c.cite}">${c.cite}</button>`).join("")}</div>` : ""}`;
+    ${extra.length ? `<div class="meta">${t("sources")}: ${extra.map((c) => `<button class="cite" data-cite="${c.cite}">${c.cite}</button>`).join("")}</div>` : ""}
+    ${r.mode && r.mode !== "offline" && r.intent !== "BRIEF" ? `<div class="meta">${r.mode === "offline_fallback" ? (S.lang === "ar" ? "إجابة قياسية من الحقائق المؤكدة" : "Standard answer from verified facts") : (S.lang === "ar" ? "صاغها الذكاء الاصطناعي من الحقائق والمصادر المؤكدة فقط" : "Worded by AI from verified facts and the sources shown only")}</div>` : ""}`;
   d.querySelectorAll(".acts .btn").forEach((b) => b.addEventListener("click", () => doAction(r.actions[+b.dataset.i], b)));
   $("#msgs").appendChild(d); if (scroll) scrollMsgs();
 }

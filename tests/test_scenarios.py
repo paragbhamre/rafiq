@@ -253,3 +253,15 @@ def test_llm_never_sees_withdrawn_pulse(monkeypatch):
     monkeypatch.setattr(llm, "_anthropic", lambda system, msgs: seen.setdefault("p", msgs[-1]["content"]) and "On track.")
     companion.chat("EMP-1006", "How am I doing?")
     assert "unhappy" not in seen["p"].lower() and "employee_checkins" not in seen["p"]
+
+
+def test_llm_truncated_reply_is_never_shown(monkeypatch):
+    from app import companion, config, llm
+    monkeypatch.setattr(config, "LLM_PROVIDER", "anthropic")
+    monkeypatch.setattr(config, "ANTHROPIC_API_KEY", "test")
+
+    def cut(system, msgs):
+        raise llm.Truncated()
+    monkeypatch.setattr(llm, "_anthropic", cut)
+    out = companion.chat("EMP-1011", "Will my manager see what I tell you?")
+    assert out["mode"] == "offline_fallback" and out["reply"].rstrip().endswith((".", "**", ")"))

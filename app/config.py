@@ -24,6 +24,7 @@ OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 OPENAI_API_STYLE = os.getenv("OPENAI_API_STYLE", "openai")  # "openai" or "azure"
 LLM_TIMEOUT_S = float(os.getenv("LLM_TIMEOUT_S", "25"))
+LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "3000"))
 
 # Minimum group size for any aggregated insight (POL-PRV-001 §5.3)
 MIN_GROUP_SIZE = int(os.getenv("RAFIQ_MIN_GROUP_SIZE", "10"))

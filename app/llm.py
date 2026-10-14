@@ -6,13 +6,22 @@ Only non-sensitive facts are sent, plus pulse data when the employee has opted i
 Use providers whose terms exclude training on and retention of submitted data.
 """
 import json
+import logging
 import re
+import time
 
 import httpx
 
 from . import config
 from .data import pack, usable_pulse
 from .policies import library
+
+log = logging.getLogger("rafiq.llm")
+logging.basicConfig(level=logging.INFO)
+
+
+class Truncated(Exception):
+    """The provider stopped at its output limit; a partial reply is never shown."""
 
 SYSTEM = """You are Rafiq, a secure employee journey companion. You work FOR the employee, never as a monitoring tool.
 Rewrite the DRAFT into a clear, warm, concise reply for the employee (max ~170 words, short paragraphs or bullets).
@@ -62,7 +71,8 @@ def rewrite(emp_id, msg, draft, ev, history=None):
             text = _openai(system, msgs)
         else:
             return None
-    except Exception:  # noqa: BLE001 - any provider failure falls back to the deterministic draft
+    except Exception as exc:  # noqa: BLE001 - any provider failure falls back to the deterministic draft
+        log.warning("llm fallback: %s", type(exc).__name__)
         return None
     if not text:
         return None
@@ -84,12 +94,21 @@ def validate(text, allowed, draft):
 def _anthropic(system, msgs):
     if not config.ANTHROPIC_API_KEY:
         return None
+    t0 = time.time()
     r = httpx.post("https://api.anthropic.com/v1/messages", timeout=config.LLM_TIMEOUT_S,
                    headers={"x-api-key": config.ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01",
                             "content-type": "application/json"},
-                   json={"model": config.ANTHROPIC_MODEL, "max_tokens": 700, "system": system, "messages": msgs})
+                   json={"model": config.ANTHROPIC_MODEL, "max_tokens": config.LLM_MAX_TOKENS,
+                         "system": system, "messages": msgs})
     r.raise_for_status()
-    return "".join(b.get("text", "") for b in r.json().get("content", []) if b.get("type") == "text")
+    body = r.json()
+    usage = body.get("usage", {})
+    # metadata only: never log message content
+    log.info("llm anthropic stop=%s in=%s out=%s ms=%d", body.get("stop_reason"), usage.get("input_tokens"),
+             usage.get("output_tokens"), (time.time() - t0) * 1000)
+    if body.get("stop_reason") == "max_tokens":
+        raise Truncated()
+    return "".join(b.get("text", "") for b in body.get("content", []) if b.get("type") == "text")
 
 
 def _openai(system, msgs):
@@ -103,10 +122,13 @@ def _openai(system, msgs):
         url = f"{config.OPENAI_BASE_URL.rstrip('/')}/chat/completions"
         headers = {"Authorization": f"Bearer {config.OPENAI_API_KEY}"}
     r = httpx.post(url, timeout=config.LLM_TIMEOUT_S, headers=headers,
-                   json={"model": config.OPENAI_MODEL, "temperature": 0.2, "max_tokens": 700,
+                   json={"model": config.OPENAI_MODEL, "temperature": 0.2, "max_tokens": config.LLM_MAX_TOKENS,
                          "messages": [{"role": "system", "content": system}] + msgs})
     r.raise_for_status()
-    return r.json()["choices"][0]["message"]["content"]
+    choice = r.json()["choices"][0]
+    if choice.get("finish_reason") == "length":
+        raise Truncated()
+    return choice["message"]["content"]
 
 
 def status():
