@@ -277,10 +277,10 @@ function bindRibbon() {
 }
 function kpi(label, value, sub = "", tone = "") { return `<div class="kpi ${tone}"><p class="kpi-l">${label}</p><p class="kpi-v">${value}</p>${sub ? `<p class="kpi-s">${sub}</p>` : ""}</div>`; }
 function pageHead(title, sub = "") { return `<header class="page-head"><h1>${title}</h1>${sub ? `<p class="muted">${sub}</p>` : ""}</header>`; }
-function reqList(reqs) {
+function reqList(reqs, empty) {
   const ar = S.lang === "ar";
   return reqs.length ? `<ul class="list">${reqs.map((q) => `<li><div class="li-row"><strong>${esc(q.subject)}</strong><span class="tag ${q.sla_state !== "OK" && isOpenReq(q) ? "STALLED" : isOpenReq(q) ? "WAITING" : "DONE"}">${esc(q.status.replaceAll("_", " ").toLowerCase())}</span></div>
-    <div class="small muted">${esc(q.request_id)} · ${esc(q.owner_name)}, ${esc(q.owner_team)}${isOpenReq(q) ? ` · ${t("open_days", { d: q.days_open })}` : ""}${isOpenReq(q) && q.sla_state !== "OK" ? ` · <span style="color:var(--red)">${ar ? "تجاوز مستوى الخدمة" : "over service level"}</span>` : ""}${q.priority === "HIGH" ? ` · ${ar ? "أولوية عالية" : "high priority"}` : ""}</div></li>`).join("")}</ul>` : `<p class="muted small">${t("none_requests")}</p>`;
+    <div class="small muted">${esc(q.request_id)} · ${esc(q.owner_name)}, ${esc(q.owner_team)}${isOpenReq(q) ? ` · ${t("open_days", { d: q.days_open })}` : ""}${isOpenReq(q) && q.sla_state !== "OK" ? ` · <span style="color:var(--red)">${ar ? "تجاوز مستوى الخدمة" : "over service level"}</span>` : ""}${q.priority === "HIGH" ? ` · ${ar ? "أولوية عالية" : "high priority"}` : ""}</div></li>`).join("")}</ul>` : `<p class="muted small">${empty || t("none_requests")}</p>`;
 }
 function notesList(notes, n = 6) {
   const ar = S.lang === "ar";
@@ -624,7 +624,7 @@ async function renderRequests() {
   $("#view").innerHTML = `${pageHead(L("My requests", "طلباتي"), L("Requests raised for you by Rafiq's service agents or by the teams helping you.", "الطلبات التي رفعها لك وكلاء الخدمة في رفيق أو الفرق التي تساعدك."))}
   <div class="dash-grid">
     <section class="panel"><div class="panel-h"><h2>${L("Open", "مفتوحة")} <span class="muted small">${open.length}</span></h2><button class="btn primary" id="newReq">${L("Ask Rafiq to help", "اطلب من رفيق المساعدة")}</button></div><div class="panel-b">${reqList(open)}</div></section>
-    <section class="panel"><div class="panel-h"><h2>${L("Completed", "مكتملة")} <span class="muted small">${done.length}</span></h2></div><div class="panel-b">${reqList(done)}</div></section>
+    <section class="panel"><div class="panel-h"><h2>${L("Completed", "مكتملة")} <span class="muted small">${done.length}</span></h2></div><div class="panel-b">${reqList(done, L("No completed requests yet.", "لا توجد طلبات مكتملة بعد."))}</div></section>
   </div>`;
   $("#newReq").onclick = () => go("chat");
 }
