@@ -101,7 +101,10 @@ def login(body: LoginIn, request: Request, response: Response):
     response.set_cookie(auth.COOKIE, auth.issue(acct), httponly=True, secure=secure, samesite="lax",
                         max_age=int(auth.SESSION_HOURS * 3600), path="/")
     state.audit(_actor(acct), "signed_in", acct["id"] if acct["role"] == "employee" else "*", "Signed in")
-    return {"user": auth.public(acct), "home": auth.home_for(acct)}
+    out = {"user": auth.public(acct), "home": auth.home_for(acct)}
+    if acct["role"] == "employee":
+        out["suggestions"] = auth.SUGGESTIONS.get(acct["id"], [])
+    return out
 
 
 @app.post("/api/logout")
@@ -115,6 +118,8 @@ def me(u: dict = Depends(auth.current_user)):
     out = {"user": auth.public(u), "home": auth.home_for(u)}
     if u["role"] == "manager":
         out["team_size"] = sum(1 for e in pack.employees.values() if e["manager_id"] == u["id"])
+    if u["role"] == "employee":
+        out["suggestions"] = auth.SUGGESTIONS.get(u["id"], [])
     return out
 
 

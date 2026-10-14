@@ -344,7 +344,19 @@ def test_reset_and_credentials_are_admin_only():
     assert "username,id,role,name,password" in a.get("/api/admin/credentials").text
 
 
-def test_sign_in_page_never_lists_passwords():
+def test_sign_in_page_reveals_no_passwords_or_situations():
     d = client.get("/api/demo-accounts").json()
-    assert "test-demo-pass" not in str(d) and len(d["employees"]) == 14
-    assert d["counts"]["employee"] == 200
+    blob = str(d).lower()
+    assert "test-demo-pass" not in blob and len(d["employees"]) == 14 and d["counts"]["employee"] == 200
+    for leak in ("laptop", "visa", "stalled", "manages", "partner for", "emp-10", "consent", "tag", "journey"):
+        assert leak not in blob, leak
+    for e in d["employees"]:
+        assert set(e) == {"name", "username"}
+
+
+def test_suggestions_only_after_sign_in_and_only_your_own():
+    assert client.get("/api/me").status_code == 401
+    me = client.get("/api/me", headers=H("employee", "EMP-1001")).json()
+    assert me["suggestions"] and "laptop" in me["suggestions"][0]
+    other = client.get("/api/me", headers=H("employee", "EMP-1002")).json()
+    assert all("laptop" not in q for q in other["suggestions"])

@@ -215,15 +215,17 @@ th { color: var(--ink-3); font-weight: 500; }
 [dir="rtl"] .who { align-items: flex-start; }
 .who-name { font-weight: 600; font-size: .92rem; }
 .who-role { color: #a9bad0; font-size: .78rem; }
-.login { display: grid; grid-template-columns: minmax(300px, 420px) 1fr; gap: 22px; align-items: start; }
-@media (max-width: 900px) { .login { grid-template-columns: 1fr; } }
-.login-card { padding: 22px; position: sticky; top: 16px; }
-@media (max-width: 900px) { .login-card { position: static; } }
-.login-card h1 { font-size: 1.45rem; font-weight: 700; letter-spacing: -.01em; margin-bottom: 6px; }
-.login-card form { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }
+.login { min-height: calc(100vh - 220px); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px 0; }
+.login-card { width: min(380px, 100%); padding: 26px 26px 20px; }
+.login-card h1 { font-size: 1.4rem; font-weight: 700; letter-spacing: -.01em; }
+.login-card form { display: flex; flex-direction: column; gap: 6px; margin-top: 18px; }
 .login-card label { font-size: .86rem; font-weight: 500; margin-top: 6px; }
-.login-card input { border: 1px solid var(--line); border-radius: var(--radius-s); padding: 9px 12px; background: #fff; }
-.login-card .btn.primary { margin-top: 10px; padding: 10px 14px; }
+.login-card input { border: 1px solid var(--line); border-radius: var(--radius-s); padding: 10px 12px; background: #fff; }
+.login-card .btn.primary { margin-top: 12px; padding: 10px 14px; }
+.demo-link { display: block; margin: 16px auto 0; font-size: .9rem; }
+.login-foot { text-align: center; }
+.acct-filter { width: 100%; border: 1px solid var(--line); border-radius: var(--radius-s); padding: 8px 12px; margin: 4px 0 6px; }
+.acct[hidden] { display: none; }
 .login-err { color: var(--red); background: var(--red-bg); border-radius: var(--radius-s); padding: 8px 10px; font-size: .88rem; }
 .login-dir h2 { margin-bottom: 4px; }
 .acct-group { margin-top: 16px; }
