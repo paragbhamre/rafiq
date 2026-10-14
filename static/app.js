@@ -150,6 +150,7 @@ function renderChrome() {
   $("#whoLink")?.addEventListener("click", () => go("profile"));
 }
 function go(page, opts = {}) {
+  finishTyping();
   if (S.page === "chat" && S.chatEl) S.chatEl.remove();
   S.page = page; if (opts.caseId) S.selectedCase = opts.caseId; else if (page !== "cases") S.selectedCase = null;
   S.pendingAsk = opts.ask || null;
@@ -451,7 +452,7 @@ function startNew(j) {
     ? "\n\n" + L(`${late.length ? `${late.length} ${late.length === 1 ? "step is" : "steps are"} behind` : ""}${late.length && today.length ? " and " : ""}${today.length ? `${today.length} ${today.length === 1 ? "is" : "are"} due today` : ""}. Ask me about any of them, or pick a question below.`,
                     `${late.length ? `هناك ${late.length} خطوات متأخرة` : ""}${late.length && today.length ? " و" : ""}${today.length ? `${today.length} مستحقة اليوم` : ""}. اسألني عن أي منها أو اختر سؤالاً أدناه.`)
     : "\n\n" + L("Everything due so far is on track. What would you like to know?", "كل ما هو مستحق حتى الآن يسير وفق الخطة. ماذا تود أن تعرف؟");
-  addBot({ reply: hello, citations: [], actions: [], lang: S.lang, intent: "BRIEF" }, false);
+  addBot({ reply: hello, citations: [], actions: [], lang: S.lang, intent: "BRIEF", stream: true }, false);
   const prompts = [...(S.suggestions || [])];
   late.slice(0, 2).forEach((s) => { const q = (ar ? "ما وضع " : "What's happening with ") + label(s) + "?"; if (!prompts.some((p) => p.includes(label(s)))) prompts.push(q); });
   prompts.push(...(ar ? ["ما هي خطواتي التالية؟", "من يمكنه رؤية بياناتي؟"] : ["What's next for me?", "Who can see my data?"]));
@@ -480,6 +481,7 @@ function renderThreadList() {
   });
 }
 async function openThread(id) {
+  finishTyping();
   const t = await api(`/api/employee/${S.user}/threads/${id}`);
   S.threadId = id; $("#msgs").innerHTML = ""; $("#suggest").classList.add("hidden");
   for (const m of t.messages) {
@@ -678,7 +680,7 @@ function stepRow(s, help = false) {
 function addMe(text) { const d = document.createElement("div"); d.className = "msg me"; d.textContent = text; $("#msgs").appendChild(d); scrollMsgs(); }
 function scrollMsgs() { const m = $("#msgs"); m.scrollTop = m.scrollHeight; }
 function addBot(r, scroll = true) {
-  const d = document.createElement("div"); d.className = "msg bot";
+  const d = document.createElement("div"); d.className = "msg bot" + (r.stream ? " streaming" : "");
   const extra = r.citations.filter((c) => !r.reply.includes(c.cite));
   d.innerHTML = `<span class="bot-av" aria-hidden="true">R</span><div class="bot-main"><div class="body" dir="${r.lang === "ar" ? "rtl" : "ltr"}">${md(r.reply)}</div>
     ${r.actions.length ? (r.restored ? restoredActs(r.actions) : `<div class="acts">${r.actions.map((a, i) => `<button class="btn ${a.primary ? "primary" : ""}" data-i="${i}">${esc(a.label)}</button>`).join("")}</div>`) : ""}
@@ -686,7 +688,38 @@ function addBot(r, scroll = true) {
     ${r.mode && r.mode !== "offline" && r.intent !== "BRIEF" ? `<div class="meta">${r.mode === "offline_fallback" ? (S.lang === "ar" ? "إجابة قياسية من الحقائق المؤكدة" : "Standard answer from verified facts") : (S.lang === "ar" ? "صاغها الذكاء الاصطناعي من الحقائق والمصادر المؤكدة فقط" : "Worded by AI from verified facts and the sources shown only")}</div>` : ""}</div>`;
   if (!r.restored) d.querySelectorAll(".acts .btn").forEach((b) => b.addEventListener("click", () => doAction(r.actions[+b.dataset.i], b)));
   $("#msgs").appendChild(d); if (scroll) scrollMsgs();
+  if (r.stream) typeOut(d, r);
 }
+
+// Reveal an answer word by word (the answer is already checked; this is presentation only)
+function typeOut(d, r) {
+  finishTyping();
+  const body = d.querySelector(".body"); const full = r.reply;
+  const reduce = window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduce || full.length < 40) { d.classList.remove("streaming"); return; }
+  const msgs = $("#msgs"); let i = 0; let raf; let follow = true;   // follow the text unless the reader scrolls up
+  const perFrame = Math.max(2, Math.ceil(full.length / 150));  // about 2.5 seconds for any length
+  const partial = (n) => {
+    let t = full.slice(0, n);
+    const lb = t.lastIndexOf("["); if (lb > t.lastIndexOf("]")) t = t.slice(0, lb);   // never show half a citation
+    if ((t.match(/\*\*/g) || []).length % 2) t += "**";                                // close bold while it's being typed
+    return t;
+  };
+  const done = () => { cancelAnimationFrame(raf); body.innerHTML = md(full); d.classList.remove("streaming"); S._typing = null;
+    if (follow) scrollMsgs(); };
+  const tick = () => {
+    follow = msgs.scrollHeight - msgs.scrollTop - msgs.clientHeight < 80;
+    i = Math.min(full.length, i + perFrame);
+    while (i < full.length && !/\s/.test(full[i])) i++;   // whole words
+    body.innerHTML = md(partial(i)).replace(/<\/p>$/, '<span class="caret"></span></p>');
+    if (follow) msgs.scrollTop = msgs.scrollHeight;
+    if (i >= full.length) return done();
+    raf = requestAnimationFrame(tick);
+  };
+  S._typing = done; body.innerHTML = '<span class="caret"></span>'; raf = requestAnimationFrame(tick);
+  d.addEventListener("click", (e) => { if (S._typing === done && !e.target.closest(".cite")) done(); }, { once: true });
+}
+function finishTyping() { if (S._typing) S._typing(); }
 function restoredActs(actions) {
   // Buttons in an earlier conversation can't be pressed again; done ones are ticked
   const ar = S.lang === "ar"; const reqs = (S.journey?.requests || []).map((q) => q.subject);
@@ -698,11 +731,12 @@ function restoredActs(actions) {
 
 async function send() {
   const inp = $("#input"); const text = inp.value.trim(); if (!text) return;
+  finishTyping();
   inp.value = ""; inp.style.height = "auto"; addMe(text); $("#typing").classList.remove("hidden");
   $("#suggest")?.classList.add("hidden");  // suggestions help you start; once you're talking they step aside
   try {
     const r = await api(`/api/employee/${S.user}/chat`, { method: "POST", body: JSON.stringify({ message: text, lang: S.lang, thread_id: S.threadId || null }) });
-    addBot(r);
+    addBot({ ...r, stream: true });
     if (r.thread_id !== S.threadId) { S.threadId = r.thread_id; }
     loadThreads();
   }
