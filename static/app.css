@@ -15,7 +15,15 @@ p { margin: 0; }
 
 /* Top bar ---------------------------------------------------------- */
 .top { background: var(--bar-bg); color: var(--bar-ink); display: flex; align-items: center; gap: 24px; padding: 0 28px; min-height: 64px; flex-wrap: wrap; border-bottom: 3px solid var(--bar-rule); }
-.brand { display: flex; align-items: baseline; gap: 10px; }
+.brand { display: flex; align-items: center; gap: 10px; }
+.mark { width: 34px; height: 34px; flex: none; }
+.mark-bubble { fill: var(--ink); }
+.mark-route { fill: none; stroke: var(--mark-route); stroke-width: 4; stroke-linecap: round; }
+.mark-start { fill: var(--surface); }
+.mark-dest { fill: var(--accent); stroke: var(--surface); stroke-width: 2.5; }
+.mark-lg { width: 48px; height: 48px; }
+.login-mark { margin-bottom: 14px; }
+[dir="rtl"] .mark { transform: scaleX(-1); }
 .brand b { font-family: var(--font-display); font-size: 1.6rem; font-weight: 600; color: var(--bar-ink); }
 .brand .brand-ar { font-family: var(--font-display); color: var(--accent); font-size: 1.15rem; }
 .brand .tagline { color: var(--bar-muted); font-size: .86rem; padding-inline-start: 10px; border-inline-start: 1px solid var(--line); }
@@ -213,3 +221,4 @@ th { color: var(--ink-3); font-weight: 500; }
 .acct span { color: var(--ink-3); font-size: .82rem; }
 .acct code { color: var(--teal-ink); font-size: .8rem; font-family: var(--font); }
 @media (max-width: 640px) { .who { display: none; } }
+[dir="rtl"] .brand .brand-ar { display: none; }
