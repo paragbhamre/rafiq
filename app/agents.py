@@ -10,7 +10,7 @@ workflow (e.g. ServiceNow, SAP SuccessFactors, Workday) behind the same interfac
 import datetime as dt
 
 from . import config
-from .data import _lock, pack, state, usable_pulse
+from .data import pack, state, usable_pulse
 from .journey import escalation_owner, step_def
 
 TEAM_ESCALATION = {
@@ -72,9 +72,7 @@ def raise_request(emp_id, key, subject, description, linked_step=None, actor="em
         "owner_name": owners.get(spec["team"], "Unassigned"), "created_at": now, "last_updated_at": now,
         "resolved_at": "", "sla_days": spec["sla"], "days_open": 0, "raised_via": "companion",
     }
-    with _lock:
-        state.data["requests"].append(req)
-        state.save()
+    state.add_request(req)
     reply, reply_ar = AGENT_REPLY.get(key, ("Request received.", "تم استلام الطلب."))
     state.audit(actor, "request_raised", emp_id, f"{req['request_id']} {spec['request_type']} -> {spec['team']}")
     state.notify(emp_id, f"{AGENT_DESK.get(spec['team'], spec['team'])}: {reply}",
@@ -94,9 +92,7 @@ def _case(emp_id, ctype, title, summary, owner, signals, shared_items, policy, l
         "policy": policy, "linked_request": linked_request, "notes": [],
         "next_update_due": (config.AS_OF + dt.timedelta(days=1)).isoformat(),
     }
-    with _lock:
-        state.data["cases"].append(case)
-        state.save()
+    state.add_case(case)
     state.audit(actor, "case_opened", emp_id, f"{case['case_id']} {ctype} -> {owner['name']} ({owner['role']})")
     return case
 
@@ -186,28 +182,22 @@ def ask_human(emp_id, question, actor="employee"):
 
 
 def _set_priority(request_id, priority):
-    with _lock:
-        for q in state.data["requests"]:
-            if q["request_id"] == request_id:
-                q["priority"] = priority
-        state.data.setdefault("priority_overrides", {})[request_id] = priority
-        state.save()
+    state.set_priority(request_id, priority)
 
 
 def update_case(case_id, status=None, note=None, actor="hrbp"):
-    with _lock:
-        for c in state.data["cases"]:
-            if c["case_id"] == case_id:
-                if status:
-                    c["status"] = status
-                if note:
-                    c["notes"].append({"at": state.now_iso(), "by": actor, "text": note})
-                state.save()
-                state.audit(actor, "case_updated", c["employee_id"], f"{case_id} status={status} note={bool(note)}")
-                if status in ("ACKNOWLEDGED", "RESOLVED"):
-                    word = "acknowledged" if status == "ACKNOWLEDGED" else "resolved"
-                    word_ar = "استلم" if status == "ACKNOWLEDGED" else "أغلق"
-                    state.notify(c["employee_id"], f"{c['owner']['name']} {word} case {case_id}." + (f" Note: {note}" if note else ""),
-                                 f"{word_ar} {c['owner']['name']} الحالة {case_id}.", "case", case_id)
-                return c
-    return None
+    c = state.get_case(case_id)
+    if not c:
+        return None
+    if status:
+        c["status"] = status
+    if note:
+        c["notes"].append({"at": state.now_iso(), "by": actor, "text": note})
+    state.save_case(c)
+    state.audit(actor, "case_updated", c["employee_id"], f"{case_id} status={status} note={bool(note)}")
+    if status in ("ACKNOWLEDGED", "RESOLVED"):
+        word = "acknowledged" if status == "ACKNOWLEDGED" else "resolved"
+        word_ar = "استلم" if status == "ACKNOWLEDGED" else "أغلق"
+        state.notify(c["employee_id"], f"{c['owner']['name']} {word} case {case_id}." + (f" Note: {note}" if note else ""),
+                     f"{word_ar} {c['owner']['name']} الحالة {case_id}.", "case", case_id)
+    return c

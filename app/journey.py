@@ -133,7 +133,7 @@ def evaluate(emp_id, as_of=None):
     requests = []
     for q in all_requests(emp_id):
         q = dict(q)
-        q["priority"] = state.data.get("priority_overrides", {}).get(q["request_id"], q.get("priority", ""))
+        q["priority"] = state.priority_for(q["request_id"]) or q.get("priority", "")
         open_ = q["status"] not in ("RESOLVED", "CLOSED")
         if open_ and q.get("created_at"):
             created = dt.date.fromisoformat(q["created_at"][:10])
@@ -234,14 +234,14 @@ def manager_view(emp_id):
 
 
 def seed_early_warnings():
-    """Create early-warning cases for RED operational friction (once per runtime). Sentiment is excluded."""
+    """Create early-warning cases for RED operational friction once (across all instances). No sentiment."""
     from . import agents  # local import to avoid a cycle
-    if state.data.get("seeded_warnings"):
-        return
-    for emp_id in pack.employees:
-        ev = evaluate(emp_id)
-        ops = [s for s in operational_signals(ev) if s["level"] == "RED" and s["type"] in ("STEP_STALLED", "BLOCKING", "REQUEST_AGEING")]
-        if ops:
-            agents.open_early_warning(emp_id, ev, ops)
-    state.data["seeded_warnings"] = True
-    state.save()
+    with state.seed_lock():
+        if state.flag_get("seeded_warnings"):
+            return
+        for emp_id in pack.employees:
+            ev = evaluate(emp_id)
+            ops = [s for s in operational_signals(ev) if s["level"] == "RED" and s["type"] in ("STEP_STALLED", "BLOCKING", "REQUEST_AGEING")]
+            if ops:
+                agents.open_early_warning(emp_id, ev, ops)
+        state.flag_set("seeded_warnings")

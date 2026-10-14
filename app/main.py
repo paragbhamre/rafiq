@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import agents, auth, companion, config, llm
-from .data import _lock, consent_active, pack, set_consent, state
+from .data import consent_active, pack, set_consent, state
 from .journey import evaluate, manager_view, operational_signals, seed_early_warnings
 
 @asynccontextmanager
@@ -72,7 +72,7 @@ def require_role(*roles):
 # --------------------------------------------------------------------------
 @app.get("/api/health")
 def health():
-    return {"ok": True, "as_of": config.AS_OF.isoformat(), "llm": llm.status(),
+    return {"ok": True, "as_of": config.AS_OF.isoformat(), "llm": llm.status(), "storage": state.health(),
             "employees": len(pack.employees), "synthetic_data": True}
 
 
@@ -199,7 +199,7 @@ def run_action(emp_id: str, body: ActionIn, u: dict = Depends(require_self)):
 
 @app.get("/api/employee/{emp_id}/notifications")
 def notifications(emp_id: str, u: dict = Depends(require_self)):
-    return [n for n in state.data["notifications"] if n["employee_id"] == emp_id][-30:][::-1]
+    return state.notifications(emp_id, 30)
 
 
 @app.get("/api/employee/{emp_id}/mydata")
@@ -213,11 +213,11 @@ def mydata(emp_id: str, u: dict = Depends(require_self)):
         pulse.append({**p, "effective_consent": status,
                       "used_by_companion": status == "ACTIVE",
                       "deletion_due": None if status == "ACTIVE" else (config.AS_OF + dt.timedelta(days=30)).isoformat()})
-    cases = [c for c in state.data["cases"] if c["employee_id"] == emp_id]
+    cases = state.cases(employee_id=emp_id)
     return {
         "profile": _public_employee(pack.employees[emp_id]),
         "consent": {"pulse_active": active,
-                    "log": [c for c in state.data["consent_log"] if c["employee_id"] == emp_id]},
+                    "log": state.consent_log(emp_id)},
         "journey_events": pack.events.get(emp_id, []),
         "requests": ev["requests"],
         "pulse": pulse,
@@ -226,9 +226,9 @@ def mydata(emp_id: str, u: dict = Depends(require_self)):
                                 "hrbp": c["hrbp"]["name"], "shared_items": c["shared_items"],
                                 "created_at": c["created_at"], "status": c["status"]} for c in cases],
         "manager_can_see": "Journey step progress only (no conversations, pulse or sentiment). See POL-PRV-001 §5.1.",
-        "conversation_messages": len(state.data["conversations"].get(emp_id, [])),
+        "conversation_messages": state.conv_count(emp_id),
         "retention": "Conversation history is deleted after 90 days, or now if you choose (POL-PRV-001 §8.1).",
-        "access_log": [a for a in state.data["audit"] if a["employee_id"] == emp_id][-20:][::-1],
+        "access_log": state.audit_for(emp_id, 20),
     }
 
 
@@ -240,9 +240,7 @@ def consent(emp_id: str, body: ConsentIn, u: dict = Depends(require_self)):
 
 @app.delete("/api/employee/{emp_id}/conversations")
 def forget(emp_id: str, u: dict = Depends(require_self)):
-    with _lock:
-        state.data["conversations"].pop(emp_id, None)
-        state.save()
+    state.conv_delete(emp_id)
     state.audit(f"employee:{emp_id}", "conversation_deleted", emp_id, "Employee deleted conversation history")
     return {"ok": True}
 
@@ -270,9 +268,9 @@ class CaseIn(BaseModel):
 
 def _case_scope(u):
     if u["role"] == "hrbp":
-        return [c for c in state.data["cases"] if c["hrbp"]["id"] == u["id"]]
+        return state.cases(hrbp_id=u["id"])
     if u["role"] == "owner":
-        return [c for c in state.data["cases"] if c["owner"]["name"] == u["id"]]
+        return state.cases(owner_name=u["id"])
     raise HTTPException(403, "Only HR Business Partners and named owners can see cases")
 
 

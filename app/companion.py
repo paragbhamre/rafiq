@@ -14,7 +14,7 @@ import datetime as dt
 import re
 
 from . import config, llm
-from .data import _lock, pack, state, usable_pulse
+from .data import pack, state, usable_pulse
 from .journey import evaluate, step_def
 from .policies import has_arabic, library, tokenize
 
@@ -682,13 +682,9 @@ def brief(emp_id, ui_lang="en"):
 
 
 def _history(emp_id):
-    return state.data["conversations"].get(emp_id, [])[-6:]
+    return state.conv_recent(emp_id, 6)
 
 
 def _remember(emp_id, msg, reply):
-    with _lock:
-        conv = state.data["conversations"].setdefault(emp_id, [])
-        conv.append({"at": state.now_iso(), "role": "user", "text": msg})
-        conv.append({"at": state.now_iso(), "role": "assistant", "text": reply})
-        del conv[:-40]
-        state.save()
+    state.conv_append(emp_id, "user", msg)
+    state.conv_append(emp_id, "assistant", reply)

@@ -26,6 +26,10 @@ OPENAI_API_STYLE = os.getenv("OPENAI_API_STYLE", "openai")  # "openai" or "azure
 LLM_TIMEOUT_S = float(os.getenv("LLM_TIMEOUT_S", "25"))
 LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "3000"))
 
+# Runtime state storage: PostgreSQL when DATABASE_URL is set (Render Postgres / Azure PostgreSQL), else a local JSON file
+DATABASE_URL = os.getenv("DATABASE_URL", "")
+DB_POOL_SIZE = int(os.getenv("RAFIQ_DB_POOL_SIZE", "5"))
+
 # Minimum group size for any aggregated insight (POL-PRV-001 §5.3)
 MIN_GROUP_SIZE = int(os.getenv("RAFIQ_MIN_GROUP_SIZE", "10"))
 

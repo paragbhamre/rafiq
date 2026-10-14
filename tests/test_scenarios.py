@@ -11,7 +11,10 @@ import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 from app import auth  # noqa: E402
+from app.data import state  # noqa: E402
 from app.main import app  # noqa: E402
+
+state.reset()  # clean store (Postgres when DATABASE_URL is set, else a temp JSON file)
 
 client = TestClient(app)
 client.__enter__()  # run startup (seeds early warnings)
@@ -360,3 +363,28 @@ def test_suggestions_only_after_sign_in_and_only_your_own():
     assert me["suggestions"] and "laptop" in me["suggestions"][0]
     other = client.get("/api/me", headers=H("employee", "EMP-1002")).json()
     assert all("laptop" not in q for q in other["suggestions"])
+
+
+
+# ---------------------------------------------------------------- persistence
+def test_state_survives_a_restart():
+    """Simulates a redeploy/sleep: a fresh store instance must see earlier cases, consent and audit."""
+    from app.store import make_store
+    r = ask("EMP-1010", "I can't get into the DWC rostering system.")
+    esc = [a for a in r["actions"] if a["type"] == "ESCALATE"][0]
+    case = client.post("/api/employee/EMP-1010/actions", json={"action": esc}, headers=H("employee", "EMP-1010")).json()["case"]
+    client.post("/api/employee/EMP-1010/consent", json={"active": False}, headers=H("employee", "EMP-1010"))
+    fresh = make_store()
+    assert fresh.get_case(case["case_id"])["owner"]["name"] == case["owner"]["name"]
+    assert fresh.consent_get("EMP-1010") == "WITHDRAWN"
+    assert any(a["action"] == "case_opened" for a in fresh.audit_for("EMP-1010", 50))
+    assert fresh.conv_count("EMP-1010") >= 2
+    client.post("/api/employee/EMP-1010/consent", json={"active": True}, headers=H("employee", "EMP-1010"))
+
+
+def test_early_warnings_seeded_once():
+    from app.journey import seed_early_warnings
+    before = len(state.cases())
+    seed_early_warnings()
+    seed_early_warnings()
+    assert len(state.cases()) == before

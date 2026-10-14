@@ -19,7 +19,8 @@ Identity comes only from a signed, HttpOnly, SameSite session cookie issued by t
 Deployed on Render from this repository using `render.yaml` (Docker, Frankfurt region, health check `/api/health`). The build runs the full test suite, so a broken commit never replaces the live version, and every push to `main` redeploys automatically.
 
 - On the **free** plan the app sleeps after 15 minutes idle, and the first visit then takes about 50 seconds. Switch to **Starter** during judging.
-- Demo data (requests, cases, consent changes) is shared by all accounts. Sign in as `admin` to reset it.
+- **Data storage.** The synthetic pack is read-only files in `data/`. Everything created while using the app lives in **Render Postgres** (`rafiq-db`, Frankfurt, private network only, no public access): `requests`, `cases`, `consent_events` (append-only), `audit_log` (append-only), `notifications`, `conversations`, `request_priority` and `flags`. It survives sleeps and redeploys, and is safe with more than one instance (early warnings are seeded once, under a Postgres advisory lock). Locally, without `DATABASE_URL`, a JSON file is used instead.
+- Demo data is shared by all accounts. Sign in as `admin` to reset it to the starting state.
 - The AI writer uses `LLM_PROVIDER=anthropic` with `ANTHROPIC_API_KEY` set in Render. Without a key it falls back to offline mode automatically.
 
 ## Run it
@@ -36,7 +37,8 @@ docker run -p 8000:8000 -e LLM_PROVIDER=anthropic -e ANTHROPIC_API_KEY=<key> raf
 ```bash
 pip install -r requirements.txt
 uvicorn app.main:app --port 8000
-python -m pytest -q          # 35 scenario, privacy, guardrail and sign-in security tests
+python -m pytest -q          # 38 tests: scenarios, privacy, guardrails, sign-in security, persistence
+DATABASE_URL=postgresql://user@host/db python -m pytest -q   # same suite against Postgres
 ```
 
 Open http://localhost:8000 and sign in. Locally the demo password is `rafiq-demo`; set `RAFIQ_ADMIN_PASSWORD` to enable the `admin` account. Add `?lang=ar` for Arabic.
@@ -78,7 +80,8 @@ static/  (vanilla JS, no build)          app/
         ▼  (SSO claims in a pilot)          companion.py  guardrails → router → grounded draft
   /api/employee/{id}/chat ───────────────▶  llm.py        optional writer: Anthropic / OpenAI-compatible / Azure
   /api/employee/{id}/actions ────────────▶  agents.py     service agents + named-owner cases
-  /api/cases  /api/manager  /api/insights   data.py       read-only pack + runtime state (JSON)
+  /api/cases  /api/manager  /api/insights   data.py       read-only pack
+  store.py      runtime state: PostgreSQL (DATABASE_URL) or local JSON
 ```
 
 ## Demo script (3 minutes)
@@ -107,5 +110,5 @@ Fourteen seeded scenarios and their expected outcomes are listed in `data/scenar
 | Data | CSV pack | Read-only feeds from HRIS, ITSM and LMS; events streamed nightly or near-real-time |
 | Agents | Simulated | Adapters to ServiceNow, SuccessFactors or Workday, and the PRO and Payroll queues |
 | LLM | Offline or any provider | An approved in-country or enterprise endpoint with no training or retention |
-| Hosting | Single container | Containerised on the customer's cloud; state in a managed database |
+| Hosting | Single container plus managed Postgres | Containerised on the customer's cloud with Azure Database for PostgreSQL (same schema) |
 | Governance | Built-in rules | DPO sign-off, a model card, quarterly bias and accuracy review, an employee feedback loop |
