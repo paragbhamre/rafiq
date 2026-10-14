@@ -55,8 +55,9 @@ async function api(path, opts = {}) {
 function toast(msg) { const el = $("#toast"); el.textContent = msg; el.classList.remove("hidden"); clearTimeout(toast._t); toast._t = setTimeout(() => el.classList.add("hidden"), 4200); }
 function fmtDate(iso) { if (!iso) return ""; const d = new Date(iso.slice(0, 10) + "T12:00:00"); return d.toLocaleDateString(S.lang === "ar" ? "ar-AE" : "en-GB", { day: "numeric", month: "short" }); }
 function md(text) {
+  text = text.replace(/🔴\s?/g, "\u0001R").replace(/⚠️\s?/g, "\u0001A").replace(/(🗓️|📅|👍|🎉)\s?/g, "");
   return text.split(/\n\n+/).map((para) => {
-    let h = esc(para)
+    let h = esc(para).replace(/\u0001R/g, '<span class="mk mk-r" aria-label="late"></span>').replace(/\u0001A/g, '<span class="mk mk-a" aria-label="at risk"></span>')
       .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
       .replace(/(^|\s)_(.+?)_(?=\s|$|[.,])/g, "$1<em>$2</em>")
       .replace(/\[([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)* §[\d.]+)\]/g, (m, c) => `<button class="cite" data-cite="${c}">${c}</button>`)
@@ -330,37 +331,56 @@ async function renderEmployeeHome() {
 }
 
 async function renderChat() {
-  const id = S.user; const ar = S.lang === "ar";
+  const id = S.user; const ar = S.lang === "ar"; const L = (en, a) => (ar ? a : en);
   if (S.chatEl && S.chatKey === `${id}|${S.lang}`) {
     $("#view").innerHTML = ""; $("#view").appendChild(S.chatEl); refreshSide(); return askPending();
   }
-  const [j, brief, notes] = await Promise.all([api(`/api/employee/${id}/journey`), api(`/api/employee/${id}/brief?lang=${S.lang}`), api(`/api/employee/${id}/notifications`)]);
-  S.journey = j;
-  const prompts = S.suggestions || [];
-  const generic = ar ? ["ما هي خطواتي التالية؟", "من يمكنه رؤية بياناتي؟"] : ["What's next for me?", "Who can see my data?"];
+  const j = S.journey = await api(`/api/employee/${id}/journey`);
   const wrap = document.createElement("div"); wrap.className = "chat-page";
   wrap.innerHTML = `
-  ${pageHead(ar ? "اسأل رفيق" : "Ask Rafiq", ar ? "إجابات من سياساتك ورحلتك، مع ذكر المصدر. ورفيق لا يقرر نيابة عن أحد." : "Answers from your policies and your journey, with the source. Rafiq never approves or decides; people do.")}
-  <div class="emp-grid">
+  <div class="chat-col">
+    ${pageHead(L("Ask Rafiq", "اسأل رفيق"), L("Answers from your policies and your journey, with the source. Rafiq never approves or decides; people do.", "إجابات من سياساتك ورحلتك، مع ذكر المصدر. ورفيق لا يقرر نيابة عن أحد."))}
+    <div class="ctx" id="ctx"></div>
     <section class="panel chat" aria-label="Chat">
       <div class="msgs" id="msgs" aria-live="polite"></div>
-      <div class="suggest" id="suggest">${[...prompts, ...generic].map((p) => `<button>${esc(p)}</button>`).join("")}</div>
-      <div class="typing hidden" id="typing">${t("thinking")}</div>
+      <div class="typing hidden" id="typing"><span></span><span></span><span></span> ${t("thinking")}</div>
+      <div class="suggest" id="suggest"></div>
       <form class="composer" id="composer"><textarea id="input" rows="1" placeholder="${t("ask")}" aria-label="${t("ask")}"></textarea><button class="btn primary" type="submit">${t("send")}</button></form>
     </section>
-    <div class="side-stack">
-      <section class="panel"><div class="panel-h"><h2>${t("your_journey")}</h2><span class="small muted" id="sideProg">${j.progress.done}/${j.progress.total}</span></div>
-        <div class="panel-b"><ul class="steps" id="sideSteps">${j.steps.map((s) => stepRow(s)).join("")}</ul></div></section>
-      <section class="panel"><div class="panel-h"><h2>${t("updates")}</h2></div><div class="panel-b" id="sideUpdates">${notesList(notes)}</div></section>
-    </div>
   </div>`;
   $("#view").innerHTML = ""; $("#view").appendChild(wrap);
   S.chatEl = wrap; S.chatKey = `${id}|${S.lang}`;
-  addBot(brief, false);
+  renderCtx(j);
+  // Short greeting from the journey (the full picture is one question away, and on Home)
+  const label = (s) => ar ? s.label_ar : s.label;
+  const late = j.steps.filter((s) => ["STALLED", "AT_RISK"].includes(s.status));
+  const today = j.steps.filter((s) => s.status === "DUE_TODAY");
+  const first = j.employee.first_name; const stage = ar ? j.stage_label_ar : j.stage_label;
+  let hello = L(`Hi ${first}. You're in **${stage}**, with ${j.progress.done} of ${j.progress.total} steps done.`,
+                `مرحباً ${first}. أنت في مرحلة **${stage}**، واكتملت ${j.progress.done} من أصل ${j.progress.total} خطوة.`);
+  hello += late.length || today.length
+    ? "\n\n" + L(`${late.length ? `${late.length} ${late.length === 1 ? "step is" : "steps are"} behind` : ""}${late.length && today.length ? " and " : ""}${today.length ? `${today.length} ${today.length === 1 ? "is" : "are"} due today` : ""}. Ask me about any of them, or pick a question below.`,
+                    `${late.length ? `هناك ${late.length} خطوات متأخرة` : ""}${late.length && today.length ? " و" : ""}${today.length ? `${today.length} مستحقة اليوم` : ""}. اسألني عن أي منها أو اختر سؤالاً أدناه.`)
+    : "\n\n" + L("Everything due so far is on track. What would you like to know?", "كل ما هو مستحق حتى الآن يسير وفق الخطة. ماذا تود أن تعرف؟");
+  addBot({ reply: hello, citations: [], actions: [], lang: S.lang, intent: "BRIEF" }, false);
+  const prompts = [...(S.suggestions || [])];
+  late.slice(0, 2).forEach((s) => { const q = (ar ? "ما وضع " : "What's happening with ") + label(s) + "?"; if (!prompts.some((p) => p.includes(label(s)))) prompts.push(q); });
+  prompts.push(...(ar ? ["ما هي خطواتي التالية؟", "من يمكنه رؤية بياناتي؟"] : ["What's next for me?", "Who can see my data?"]));
+  $("#suggest").innerHTML = [...new Set(prompts)].slice(0, 5).map((p) => `<button>${esc(p)}</button>`).join("");
   $("#composer").addEventListener("submit", (ev) => { ev.preventDefault(); send(); });
   $("#input").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); send(); } });
+  $("#input").addEventListener("input", (ev) => { ev.target.style.height = "auto"; ev.target.style.height = Math.min(140, ev.target.scrollHeight) + "px"; });
   $("#suggest").addEventListener("click", (ev) => { const b = ev.target.closest("button"); if (b) { $("#input").value = b.textContent; send(); } });
+  $("#ctx").addEventListener("click", (ev) => { if (ev.target.closest("[data-go]")) go(ev.target.closest("[data-go]").dataset.go); });
   askPending();
+}
+function renderCtx(j) {
+  const ar = S.lang === "ar"; const L = (en, a) => (ar ? a : en);
+  const late = j.steps.filter((s) => ["STALLED", "AT_RISK"].includes(s.status)).length;
+  const el = $("#ctx"); if (!el) return;
+  el.innerHTML = `<span>${esc(ar ? j.stage_label_ar : j.stage_label)}</span><span>${j.progress.done}/${j.progress.total} ${L("steps", "خطوات")}</span>
+    ${late ? `<span><span class="mk mk-r"></span>${late} ${L("behind", "متأخرة")}</span>` : `<span>${L("On track", "وفق الخطة")}</span>`}
+    <button class="linkbtn" data-go="journey">${L("View journey", "عرض الرحلة")}</button>`;
 }
 function askPending() { if (S.pendingAsk) { $("#input").value = S.pendingAsk; S.pendingAsk = null; send(); } else $("#input")?.focus(); }
 
@@ -490,16 +510,17 @@ function scrollMsgs() { const m = $("#msgs"); m.scrollTop = m.scrollHeight; }
 function addBot(r, scroll = true) {
   const d = document.createElement("div"); d.className = "msg bot";
   const extra = r.citations.filter((c) => !r.reply.includes(c.cite));
-  d.innerHTML = `<div class="body" dir="${r.lang === "ar" ? "rtl" : "ltr"}">${md(r.reply)}</div>
+  d.innerHTML = `<span class="bot-av" aria-hidden="true">R</span><div class="bot-main"><div class="body" dir="${r.lang === "ar" ? "rtl" : "ltr"}">${md(r.reply)}</div>
     ${r.actions.length ? `<div class="acts">${r.actions.map((a, i) => `<button class="btn ${a.primary ? "primary" : ""}" data-i="${i}">${esc(a.label)}</button>`).join("")}</div>` : ""}
     ${extra.length ? `<div class="meta">${t("sources")}: ${extra.map((c) => `<button class="cite" data-cite="${c.cite}">${c.cite}</button>`).join("")}</div>` : ""}
-    ${r.mode && r.mode !== "offline" && r.intent !== "BRIEF" ? `<div class="meta">${r.mode === "offline_fallback" ? (S.lang === "ar" ? "إجابة قياسية من الحقائق المؤكدة" : "Standard answer from verified facts") : (S.lang === "ar" ? "صاغها الذكاء الاصطناعي من الحقائق والمصادر المؤكدة فقط" : "Worded by AI from verified facts and the sources shown only")}</div>` : ""}`;
+    ${r.mode && r.mode !== "offline" && r.intent !== "BRIEF" ? `<div class="meta">${r.mode === "offline_fallback" ? (S.lang === "ar" ? "إجابة قياسية من الحقائق المؤكدة" : "Standard answer from verified facts") : (S.lang === "ar" ? "صاغها الذكاء الاصطناعي من الحقائق والمصادر المؤكدة فقط" : "Worded by AI from verified facts and the sources shown only")}</div>` : ""}</div>`;
   d.querySelectorAll(".acts .btn").forEach((b) => b.addEventListener("click", () => doAction(r.actions[+b.dataset.i], b)));
   $("#msgs").appendChild(d); if (scroll) scrollMsgs();
 }
 async function send() {
   const inp = $("#input"); const text = inp.value.trim(); if (!text) return;
-  inp.value = ""; addMe(text); $("#typing").classList.remove("hidden");
+  inp.value = ""; inp.style.height = "auto"; addMe(text); $("#typing").classList.remove("hidden");
+  $("#suggest")?.classList.add("hidden");  // suggestions help you start; once you're talking they step aside
   try { addBot(await api(`/api/employee/${S.user}/chat`, { method: "POST", body: JSON.stringify({ message: text, lang: S.lang }) })); }
   catch (e) { addBot({ reply: e.message, citations: [], actions: [], lang: S.lang }); }
   finally { $("#typing").classList.add("hidden"); }
@@ -553,6 +574,7 @@ async function refreshSide() {
   if ($("#sideSteps")) $("#sideSteps").innerHTML = j.steps.map((s) => stepRow(s)).join("");
   if ($("#sideProg")) $("#sideProg").textContent = `${j.progress.done}/${j.progress.total}`;
   if ($("#sideUpdates")) $("#sideUpdates").innerHTML = notesList(notes);
+  renderCtx(j);
 }
 
 async function showCite(cite) {
