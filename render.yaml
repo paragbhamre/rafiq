@@ -11,7 +11,7 @@ services:
       - key: RAFIQ_AS_OF
         value: "2026-10-14"
       - key: LLM_PROVIDER
-        value: offline    # set to "anthropic" and add ANTHROPIC_API_KEY to enable the AI writer
+        value: anthropic  # AI writer on; falls back to offline automatically if the key is missing or the API fails
       - key: ANTHROPIC_MODEL
         value: claude-sonnet-5-5
       - key: ANTHROPIC_API_KEY
