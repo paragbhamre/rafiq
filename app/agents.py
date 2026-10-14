@@ -78,7 +78,18 @@ def raise_request(emp_id, key, subject, description, linked_step=None, actor="em
     state.notify(emp_id, f"{AGENT_DESK.get(spec['team'], spec['team'])}: {reply}",
                  f"{AGENT_DESK.get(spec['team'], spec['team'])}: {reply_ar}", "request", req["request_id"])
     return {"request": req, "agent": AGENT_DESK.get(spec["team"], spec["team"]), "agent_reply": reply,
-            "agent_reply_ar": reply_ar, "policy": spec["policy"]}
+            "agent_reply_ar": reply_ar, "policy": _cites([spec["policy"]])}
+
+
+def _cites(refs):
+    """Rafiq's rule references resolved to citations in the loaded pack (unresolvable ones dropped)."""
+    from .policies import library
+    out = []
+    for r in refs or []:
+        c = library.resolve(r)
+        if c and c not in out:
+            out.append(c)
+    return out
 
 
 def _case(emp_id, ctype, title, summary, owner, signals, shared_items, policy, linked_request=None, actor="companion"):
@@ -89,7 +100,7 @@ def _case(emp_id, ctype, title, summary, owner, signals, shared_items, policy, l
         "type": ctype, "title": title, "summary": summary, "owner": owner,
         "hrbp": {"id": emp["hrbp_id"], "name": emp["hrbp_name"]}, "status": "OPEN",
         "created_at": state.now_iso(), "signals": signals, "shared_items": shared_items,
-        "policy": policy, "linked_request": linked_request, "notes": [],
+        "policy": _cites(policy), "linked_request": linked_request, "notes": [],
         "next_update_due": (config.AS_OF + dt.timedelta(days=1)).isoformat(),
     }
     state.add_case(case)

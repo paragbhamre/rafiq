@@ -1,0 +1,20 @@
+{
+  "_comment": "Copy to packs/official/mapping.json and keep only what differs from the brief's names. Keys under 'columns' are the pack's names; values are Rafiq's. Value maps use Rafiq's column names.",
+  "files": {
+    "employees": "employees.csv",
+    "events": "journey_events.csv",
+    "requests": "service_requests.csv",
+    "pulse": "pulse_feedback.csv"
+  },
+  "columns": {
+    "employees": { "staff_id": "employee_id", "journey": "journey_type", "start_date": "journey_anchor_date" },
+    "events": { "staff_id": "employee_id", "completed_on": "event_timestamp" },
+    "requests": { "staff_id": "employee_id", "ticket_status": "status" },
+    "pulse": { "staff_id": "employee_id", "consent": "consent_status" }
+  },
+  "values": {
+    "employees": { "journey_type": { "NEW_JOINER": "ONBOARDING", "INTERNAL_MOVE": "MOBILITY" } },
+    "requests": { "status": { "In Progress": "IN_PROGRESS", "Awaiting info": "PENDING_INFO" } },
+    "pulse": { "consent_status": { "Granted": "ACTIVE", "Revoked": "WITHDRAWN" } }
+  }
+}

@@ -59,12 +59,17 @@ function md(text) {
     let h = esc(para)
       .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
       .replace(/(^|\s)_(.+?)_(?=\s|$|[.,])/g, "$1<em>$2</em>")
-      .replace(/\[(POL-[A-Z]{2,4}-\d{3} §[\d.]+)\]/g, (m, c) => `<button class="cite" data-cite="${c}">${c}</button>`)
+      .replace(/\[([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)* §[\d.]+)\]/g, (m, c) => `<button class="cite" data-cite="${c}">${c}</button>`)
       .replace(/\(نص السياسة بالإنجليزية\)/g, '<span class="muted small">(نص السياسة بالإنجليزية)</span>');
     const isPol = /^• /.test(para);
     if (isPol) h = h.replace(/^• /, "").replace(/^(.*?)(\s*<button class="cite")/, '<bdi dir="auto">$1</bdi>$2');
     return `<p class="${isPol ? "pol" : ""}">${h.replace(/\n/g, "<br>")}</p>`;
   }).join("");
+}
+// Citations the interface shows are named by their synthetic-pack reference; the server maps them to the loaded pack
+function citeBtn(ref) {
+  const c = S.citeMap && ref in S.citeMap ? S.citeMap[ref] : ref;
+  return c ? `<button class="cite" data-cite="${esc(c)}">${esc(c)}</button>` : "";
 }
 function setLang(lang, user = false) {
   if (user) S.langChosen = true;
@@ -121,7 +126,7 @@ const SIDE_NOTE = {
   admin: ["Synthetic data only.", "بيانات افتراضية فقط."],
 };
 function signedIn(d) {
-  S.me = d.user; S.suggestions = d.suggestions || []; S.user = d.user.id; S.role = d.user.role; S.selectedCase = null;
+  S.me = d.user; S.suggestions = d.suggestions || []; S.citeMap = d.cite_map || null; S.user = d.user.id; S.role = d.user.role; S.selectedCase = null;
   S.page = S.role === "admin" ? "admin" : "home"; S.chatEl = null;
   if (S.role === "employee" && d.user.lang === "ar" && !S.langChosen) { setLang("ar"); renderBanner(); }
   renderChrome(); render();
@@ -568,7 +573,7 @@ async function openMyData() {
   const d = await api(`/api/employee/${S.user}/mydata`); const ar = S.lang === "ar";
   const L = (en, a) => (ar ? a : en);
   $("#dlgInner").innerHTML = `
-  <div class="dlg-h"><div><h2>${t("my_data")}</h2><p class="small muted">${L("Everything Rafiq holds about you, and who it has been shared with.", "كل ما يحتفظ به رفيق عنك، ومع من تمت مشاركته.")} [POL-PRV-001 §4.1]</p></div></div>
+  <div class="dlg-h"><div><h2>${t("my_data")}</h2><p class="small muted">${L("Everything Rafiq holds about you, and who it has been shared with.", "كل ما يحتفظ به رفيق عنك، ومع من تمت مشاركته.")} ${citeBtn("POL-PRV-001 §4.1")}</p></div></div>
   <div class="dlg-b">
     <div class="md-sec"><h3>${L("Check-in feedback consent", "الموافقة على ملاحظات الاستطلاع")}</h3>
       <div class="switch"><span class="state-pill ${d.consent.pulse_active ? "st-GREEN" : "st-AMBER"}">${d.consent.pulse_active ? L("Opted in", "موافق") : L("Not opted in", "غير موافق")}</span>
@@ -580,7 +585,7 @@ async function openMyData() {
       ${d.signals_about_me.length ? d.signals_about_me.map((s) => `<div class="sig ${s.level}">${esc(ar ? s.message_ar : s.message)}${s.sensitive ? ` <span class="small muted">(${L("only you see this", "تراه أنت فقط")})</span>` : ""}</div>`).join("") : `<p class="muted small">${L("None — you're on track.", "لا يوجد — رحلتك تسير وفق الخطة.")}</p>`}</div>
     <div class="md-sec"><h3>${L("Shared with others", "ما تمت مشاركته مع الآخرين")}</h3>
       ${d.shared_with_others.length ? `<table><tr><th>${L("Case", "الحالة")}</th><th>${L("With", "مع")}</th><th>${L("What was shared", "ما تمت مشاركته")}</th></tr>${d.shared_with_others.map((c) => `<tr><td>${esc(c.case_id)}<br><span class="small muted">${esc(c.type.replace("_", " ").toLowerCase())}</span></td><td>${esc(c.owner.name)} (${esc(c.owner.role)})<br><span class="small muted">cc ${esc(c.hrbp)}</span></td><td>${c.shared_items.map(esc).join(", ")}</td></tr>`).join("")}</table>` : `<p class="muted small">${L("Nothing has been shared.", "لم تتم مشاركة أي شيء.")}</p>`}
-      <p class="small muted" style="margin-top:6px">${L("Your manager sees journey step progress only.", "يرى مديرك تقدم خطوات الرحلة فقط.")} [POL-PRV-001 §5.1]</p></div>
+      <p class="small muted" style="margin-top:6px">${L("Your manager sees journey step progress only.", "يرى مديرك تقدم خطوات الرحلة فقط.")} ${citeBtn("POL-PRV-001 §5.1")}</p></div>
     <div class="md-sec"><h3>${L("Your profile", "ملفك")}</h3><dl class="kv">${Object.entries(d.profile).filter(([, v]) => v).map(([k, v]) => `<dt>${esc(k.replaceAll("_", " "))}</dt><dd>${esc(v)}</dd>`).join("")}</dl></div>
     <div class="md-sec"><h3>${L("Conversation history", "سجل المحادثات")}</h3><p class="small">${d.conversation_messages} ${L("messages stored.", "رسالة محفوظة.")} ${esc(d.retention)}</p>
       <button class="btn danger" id="forgetBtn" style="margin-top:6px">${L("Delete my conversation history", "حذف سجل محادثاتي")}</button></div>
@@ -588,7 +593,7 @@ async function openMyData() {
   </div>
   <div class="dlg-f"><button class="btn" onclick="document.getElementById('dlg').close()">${t("close")}</button></div>`;
   const dlg = $("#dlg"); dlg.className = "wide"; if (!dlg.open) dlg.showModal();
-  $("#dlgInner").innerHTML = $("#dlgInner").innerHTML.replace(/\[(POL-[A-Z]{2,4}-\d{3} §[\d.]+)\]/g, (m, c) => `<button class="cite" data-cite="${c}">${c}</button>`);
+  $("#dlgInner").innerHTML = $("#dlgInner").innerHTML.replace(/\[([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)* §[\d.]+)\]/g, (m, c) => `<button class="cite" data-cite="${c}">${c}</button>`);
   $("#consentBtn").onclick = async () => { await api(`/api/employee/${S.user}/consent`, { method: "POST", body: JSON.stringify({ active: !d.consent.pulse_active }) }); toast(d.consent.pulse_active ? L("Consent withdrawn.", "تم سحب الموافقة.") : L("Thanks — you've opted in.", "شكراً — تمت الموافقة.")); openMyData(); };
   $("#forgetBtn").onclick = async () => { await api(`/api/employee/${S.user}/conversations`, { method: "DELETE" }); toast(L("Conversation history deleted.", "تم حذف سجل المحادثات.")); openMyData(); };
 }
@@ -615,7 +620,7 @@ async function renderManagerHome() {
       ${soon.length ? `<ul class="list">${soon.map((m) => `<li><div class="li-row"><strong>${esc(m.name)}</strong><span class="small muted">${L(`in ${-m.journey_day} days`, `بعد ${-m.journey_day} أيام`)}</span></div><div class="small muted">${esc(m.role_title)} · ${m.journey_type === "ONBOARDING" ? t("onboarding") : t("mobility")}</div></li>`).join("")}</ul>` : `<p class="muted small">${L("No one starting in the coming weeks.", "لا أحد يبدأ في الأسابيع القادمة.")}</p>`}
     </div></section>
   </div>
-  <div class="guard">${L("You see step progress only — never conversations, check-in feedback or sentiment. Want to know how someone is feeling? Ask them.", "ترى تقدم الخطوات فقط — وليس المحادثات أو ملاحظات الاستطلاع أو المشاعر. تريد معرفة شعور أحدهم؟ اسأله.")} <button class="cite" data-cite="POL-PRV-001 §5.1">POL-PRV-001 §5.1</button></div>`;
+  <div class="guard">${L("You see step progress only — never conversations, check-in feedback or sentiment. Want to know how someone is feeling? Ask them.", "ترى تقدم الخطوات فقط — وليس المحادثات أو ملاحظات الاستطلاع أو المشاعر. تريد معرفة شعور أحدهم؟ اسأله.")} ${citeBtn("POL-PRV-001 §5.1")}</div>`;
   document.querySelectorAll("[data-go]").forEach((b) => b.onclick = () => go(b.dataset.go));
 }
 
@@ -645,7 +650,7 @@ async function renderCaseHome() {
       <p class="small muted" style="margin-top:8px">${L("Groups under 10 people are hidden.", "تُخفى المجموعات التي تقل عن 10 أشخاص.")}</p>
     </div></section>
   </div>
-  <div class="guard">${L("Not for use in performance, probation or disciplinary decisions. Conversations are never shared; check-in feedback only when the employee chooses.", "لا يُستخدم في قرارات الأداء أو التجربة أو التأديب. لا تتم مشاركة المحادثات أبداً، وملاحظات الاستطلاع فقط باختيار الموظف.")} <button class="cite" data-cite="POL-PRV-001 §6.2">POL-PRV-001 §6.2</button></div>`;
+  <div class="guard">${L("Not for use in performance, probation or disciplinary decisions. Conversations are never shared; check-in feedback only when the employee chooses.", "لا يُستخدم في قرارات الأداء أو التجربة أو التأديب. لا تتم مشاركة المحادثات أبداً، وملاحظات الاستطلاع فقط باختيار الموظف.")} ${citeBtn("POL-PRV-001 §6.2")}</div>`;
   document.querySelectorAll("[data-go]").forEach((b) => b.onclick = () => go(b.dataset.go));
   document.querySelectorAll("[data-case]").forEach((b) => b.onclick = () => { S.caseFilter = "ALL"; go("cases", { caseId: b.dataset.case }); });
 }
@@ -656,7 +661,7 @@ async function renderManager() {
   const L = (en, a) => (ar ? a : en);
   $("#view").innerHTML = `
     <section class="panel"><div class="panel-h"><div><h2>${L("Your team's journeys", "رحلات فريقك")}</h2>
-      <p class="small muted">${L("You see step progress only — never conversations, check-in feedback or sentiment.", "ترى تقدم الخطوات فقط — وليس المحادثات أو ملاحظات الاستطلاع أو المشاعر.")} <button class="cite" data-cite="POL-PRV-001 §5.1">POL-PRV-001 §5.1</button></p></div></div>
+      <p class="small muted">${L("You see step progress only — never conversations, check-in feedback or sentiment.", "ترى تقدم الخطوات فقط — وليس المحادثات أو ملاحظات الاستطلاع أو المشاعر.")} ${citeBtn("POL-PRV-001 §5.1")}</p></div></div>
     <div class="panel-b" style="overflow-x:auto"><table>
       <tr><th>${L("Person", "الموظف")}</th><th>${L("Journey", "الرحلة")}</th><th>${L("Steps", "الخطوات")}</th><th>${L("Overdue steps", "خطوات متأخرة")}</th></tr>
       ${d.team.map((m) => `<tr><td><strong>${esc(m.name)}</strong><br><span class="small muted">${esc(m.role_title)}</span></td>
@@ -664,7 +669,7 @@ async function renderManager() {
         <td><div class="dots">${m.steps.map((s) => `<i class="${s.status}" title="${esc(s.label)}: ${t("status")[s.status]}"></i>`).join("")}</div><span class="small muted">${m.progress.done}/${m.progress.total}</span></td>
         <td class="small">${m.overdue_steps.length ? m.overdue_steps.map(esc).join("<br>") : "—"}</td></tr>`).join("")}
     </table>
-    <div class="guard">${L("Want to know how someone is feeling? Ask them. Rafiq is the employee's companion, not a monitoring tool.", "تريد معرفة شعور أحد أعضاء فريقك؟ اسأله مباشرة. رفيق مساعد للموظف وليس أداة مراقبة.")} <button class="cite" data-cite="POL-PRV-001 §1.2">POL-PRV-001 §1.2</button></div></div></section>`;
+    <div class="guard">${L("Want to know how someone is feeling? Ask them. Rafiq is the employee's companion, not a monitoring tool.", "تريد معرفة شعور أحد أعضاء فريقك؟ اسأله مباشرة. رفيق مساعد للموظف وليس أداة مراقبة.")} ${citeBtn("POL-PRV-001 §1.2")}</div></div></section>`;
 }
 
 /* ------------------------------------------------------------------ HRBP / owner inbox */
@@ -702,7 +707,7 @@ function caseDetail(c, kinds) {
     ${c.signals.length ? `<h3 style="margin-top:14px">${L("Signals", "التنبيهات")}</h3>${c.signals.map((s) => `<div class="sig ${s.level}">${esc(s.message)}</div>`).join("")}` : ""}
     ${c.policy.length ? `<p style="margin-top:12px">${c.policy.map((p) => `<button class="cite" data-cite="${p}">${p}</button>`).join(" ")}</p>` : ""}
     <div class="guard"><strong>${L("Shared by the employee:", "ما شاركه الموظف:")}</strong> ${c.shared_items.map(esc).join(", ")}.<br>
-      ${L("Conversations are never shared. Check-in feedback appears only if the employee chose to include it. Not for use in performance, probation or disciplinary decisions.", "لا تتم مشاركة المحادثات أبداً. تظهر ملاحظات الاستطلاع فقط إذا اختار الموظف ذلك. لا يجوز استخدامها في قرارات الأداء أو التجربة أو التأديب.")} <button class="cite" data-cite="POL-PRV-001 §6.2">POL-PRV-001 §6.2</button></div>
+      ${L("Conversations are never shared. Check-in feedback appears only if the employee chose to include it. Not for use in performance, probation or disciplinary decisions.", "لا تتم مشاركة المحادثات أبداً. تظهر ملاحظات الاستطلاع فقط إذا اختار الموظف ذلك. لا يجوز استخدامها في قرارات الأداء أو التجربة أو التأديب.")} ${citeBtn("POL-PRV-001 §6.2")}</div>
     ${c.notes.length ? `<h3 style="margin-top:14px">${L("Notes", "ملاحظات")}</h3><ul class="notes">${c.notes.map((n) => `<li>${esc(n.at.slice(0, 10))} · ${esc(n.by)}: ${esc(n.text)}</li>`).join("")}</ul>` : ""}
     <label class="small" for="caseNote" style="display:block;margin-top:14px">${L("Note to the employee (optional)", "ملاحظة للموظف (اختياري)")}</label>
     <textarea id="caseNote" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:8px;min-height:60px"></textarea>

@@ -72,7 +72,7 @@ def require_role(*roles):
 # --------------------------------------------------------------------------
 @app.get("/api/health")
 def health():
-    return {"ok": True, "as_of": config.AS_OF.isoformat(), "ai_writer": llm.status()["configured"], "storage": state.health(),
+    return {"ok": True, "as_of": config.AS_OF.isoformat(), "ai_writer": llm.status()["configured"], "storage": state.health(), "pack": "synthetic" if config.IS_REFERENCE_PACK else config.DATA_DIR.name,
             "employees": len(pack.employees), "synthetic_data": True}
 
 
@@ -85,6 +85,21 @@ class LoginIn(BaseModel):
 def demo_accounts():
     """Featured synthetic accounts for the sign-in page. Usernames only, never passwords."""
     return auth.demo_accounts()
+
+
+UI_REFS = ["POL-PRV-001 §1.2", "POL-PRV-001 §4.1", "POL-PRV-001 §5.1", "POL-PRV-001 §5.2", "POL-PRV-001 §5.3",
+           "POL-PRV-001 §6.2", "POL-PRV-001 §8.1"]
+
+
+def ui_cites():
+    """Privacy references the interface shows, resolved to the loaded pack (None = not found, hide it)."""
+    from .policies import library
+    return {r: library.resolve(r) for r in UI_REFS}
+
+
+def cref(ref, fallback="the privacy policy"):
+    from .policies import library
+    return library.resolve(ref) or fallback
 
 
 @app.post("/api/login")
@@ -101,9 +116,9 @@ def login(body: LoginIn, request: Request, response: Response):
     response.set_cookie(auth.COOKIE, auth.issue(acct), httponly=True, secure=secure, samesite="lax",
                         max_age=int(auth.SESSION_HOURS * 3600), path="/")
     state.audit(_actor(acct), "signed_in", acct["id"] if acct["role"] == "employee" else "*", "Signed in")
-    out = {"user": auth.public(acct), "home": auth.home_for(acct)}
+    out = {"user": auth.public(acct), "home": auth.home_for(acct), "cite_map": ui_cites()}
     if acct["role"] == "employee":
-        out["suggestions"] = auth.SUGGESTIONS.get(acct["id"], [])
+        out["suggestions"] = auth.suggestions_for(acct["id"])
     return out
 
 
@@ -115,11 +130,11 @@ def logout(response: Response, u: dict = Depends(auth.current_user)):
 
 @app.get("/api/me")
 def me(u: dict = Depends(auth.current_user)):
-    out = {"user": auth.public(u), "home": auth.home_for(u)}
+    out = {"user": auth.public(u), "home": auth.home_for(u), "cite_map": ui_cites()}
     if u["role"] == "manager":
         out["team_size"] = sum(1 for e in pack.employees.values() if e["manager_id"] == u["id"])
     if u["role"] == "employee":
-        out["suggestions"] = auth.SUGGESTIONS.get(u["id"], [])
+        out["suggestions"] = auth.suggestions_for(u["id"])
     return out
 
 
@@ -235,9 +250,9 @@ def mydata(emp_id: str, u: dict = Depends(require_self)):
         "shared_with_others": [{"case_id": c["case_id"], "type": c["type"], "owner": c["owner"],
                                 "hrbp": c["hrbp"]["name"], "shared_items": c["shared_items"],
                                 "created_at": c["created_at"], "status": c["status"]} for c in cases],
-        "manager_can_see": "Journey step progress only (no conversations, pulse or sentiment). See POL-PRV-001 §5.1.",
+        "manager_can_see": f"Journey step progress only (no conversations, pulse or sentiment). See {cref('POL-PRV-001 §5.1')}.",
         "conversation_messages": state.conv_count(emp_id),
-        "retention": "Conversation history is deleted after 90 days, or now if you choose (POL-PRV-001 §8.1).",
+        "retention": f"Conversation history is deleted after 90 days, or now if you choose ({cref('POL-PRV-001 §8.1')}).",
         "access_log": state.audit_for(emp_id, 20),
     }
 
@@ -264,7 +279,7 @@ def team(mgr_id: str, u: dict = Depends(auth.current_user)):
         raise HTTPException(403, "Managers can only see their own team")
     members = [e for e in pack.employees.values() if e["manager_id"] == mgr_id]
     state.audit(f"manager:{mgr_id}", "team_view", "*", f"Viewed step progress for {len(members)} people")
-    return {"manager": pack.managers.get(mgr_id), "visibility": "Journey step progress only (POL-PRV-001 §5.1)",
+    return {"manager": pack.managers.get(mgr_id), "visibility": f"Journey step progress only ({cref('POL-PRV-001 §5.1')})",
             "team": [manager_view(e["employee_id"]) for e in members]}
 
 
@@ -351,7 +366,7 @@ def stalls(group: str = "location", u: dict = Depends(auth.current_user)):
         rows.append(row)
     rows.sort(key=lambda r: -r["rate"])
     return {"group_by": group, "groups": groups, "rows": rows, "min_group_size": config.MIN_GROUP_SIZE,
-            "note": "Aggregated and anonymised; cells with fewer than 10 employees are hidden (POL-PRV-001 §5.3). "
+            "note": "Aggregated and anonymised; cells with fewer than 10 employees are hidden (" + cref("POL-PRV-001 §5.3") + "). "
                     "Rate = steps currently late or completed late, divided by steps due."}
 
 

@@ -91,11 +91,17 @@ TEAM_AR = {
     "Government Relations (PRO)": "العلاقات الحكومية", "Facilities": "إدارة المرافق", "Security": "الأمن",
     "Learning & Development": "التعلم والتطوير", "Global Mobility": "التنقل العالمي", "Payroll": "الرواتب",
     "Talent Acquisition": "استقطاب المواهب",
+    "Facilities / Global Mobility": "إدارة المرافق / التنقل العالمي",
 }
 
 
 def _team(name, ar):
-    return TEAM_AR.get(name, name) if ar else name
+    """Arabic team name; joint teams ("Facilities / Global Mobility") are translated part by part."""
+    if not ar:
+        return name
+    if name in TEAM_AR:
+        return TEAM_AR[name]
+    return " / ".join(TEAM_AR.get(part.strip(), part.strip()) for part in name.split("/"))
 
 
 def _fmt_date(iso, ar=False):
@@ -125,14 +131,17 @@ class Draft:
         self.lines.append(self.t(en, ar or en))
 
     def cite(self, *cites):
+        # Citations in code name rules by their synthetic-pack reference; library.lookup maps them to the loaded pack
         for c in cites:
-            if c and library.get(c) and c not in self.cites:
-                self.cites.append(c)
+            sec = library.lookup(c)
+            if sec and sec["cite"] not in self.cites:
+                self.cites.append(sec["cite"])
 
     def policy_line(self, cite, prefix_en="", prefix_ar=""):
-        sec = library.get(cite)
-        if not sec or cite in self.shown:
+        sec = library.lookup(cite)
+        if not sec or sec["cite"] in self.shown:
             return False
+        cite = sec["cite"]
         self.shown.add(cite)
         self.cite(cite)
         note = self.t("", " (نص السياسة بالإنجليزية)")
@@ -307,14 +316,20 @@ def compose_topic(draft, ev, emp, topic, codes):
 def _entitlement(draft, ev, emp):
     msg = draft._msg
     if re.search(r"transport|commute|مواصلات|النقل", msg):
-        draft.say("If you're not on a company transport route, you receive a transport allowance of **AED 1,000 a month**.",
+        if not library.same_text("POL-ALW-001 §3.1"):
+            draft.say("Here's what the policy says:", "هذا ما تنص عليه السياسة:")
+        else:
+          draft.say("If you're not on a company transport route, you receive a transport allowance of **AED 1,000 a month**.",
                   "إذا لم تكن على أحد خطوط النقل التابعة للشركة، تحصل على بدل مواصلات قدره **1,000 درهم شهرياً**.")
         draft.policy_line("POL-ALW-001 §3.1", "• ", "• ")
         draft.policy_line("POL-ALW-001 §3.2", "• ", "• ")
         return
     if re.search(r"settling|joining allowance|استقرار", msg):
         settle = "AED 8,000" if emp["family_status"] == "FAMILY" else "AED 5,000"
-        draft.say(f"The settling-in allowance for new joiners from abroad is **{settle}** for you, paid once with your first salary.",
+        if not library.same_text("POL-ALW-001 §1.2"):
+            draft.say("Here's what the policy says:", "هذا ما تنص عليه السياسة:")
+        else:
+          draft.say(f"The settling-in allowance for new joiners from abroad is **{settle}** for you, paid once with your first salary.",
                   f"بدل الاستقرار للموظفين الجدد القادمين من الخارج هو **{settle}** بالنسبة لك، يُصرف مرة واحدة مع أول راتب.")
         for c in ("POL-ALW-001 §1.1", "POL-ALW-001 §1.2", "POL-ALW-001 §1.3"):
             draft.policy_line(c, "• ", "• ")
@@ -325,19 +340,24 @@ def _entitlement(draft, ev, emp):
                       "أنت مؤهل للسكن الذي توفره الشركة، لذلك لا ينطبق بدل السكن أثناء إقامتك فيه.")
             draft.policy_line("POL-ALW-001 §2.4", "• ", "• ")
             return
-        amt = config.HOUSING_ALLOWANCE.get(emp["grade"])
+        amt = config.HOUSING_ALLOWANCE.get(emp["grade"]) if library.same_text("POL-ALW-001 §2.2") else None
         if amt:
             draft.say(f"For your grade ({emp['grade']}), the housing allowance is **AED {amt:,} a month**, paid with your salary from your joining date.",
                       f"لدرجتك الوظيفية ({emp['grade']})، بدل السكن هو **{amt:,} درهم شهرياً**، ويُصرف مع راتبك اعتباراً من تاريخ التحاقك.")
-        else:
+        elif library.same_text("POL-ALW-001 §2.2"):
             draft.say(f"For grade {emp['grade']}, the housing allowance is the amount stated in your contract.",
                       f"للدرجة {emp['grade']}، بدل السكن هو المبلغ المنصوص عليه في عقدك.")
+        else:
+            draft.say(f"Here's what the policy says for your grade ({emp['grade']}):", f"هذا ما تنص عليه السياسة لدرجتك ({emp['grade']}):")
         draft.policy_line("POL-ALW-001 §2.2", "• ", "• ")
         draft.policy_line("POL-ALW-001 §2.3", "• ", "• ")
         draft.policy_line("POL-ALW-001 §6.1", "• ", "• ")
         return
     mt = emp.get("move_type")
-    if mt == "LOCATION_INTERNATIONAL":
+    if mt in ("LOCATION_INTERNATIONAL", "LOCATION_DOMESTIC") and not library.same_text("POL-ALW-001 §4.1", "POL-ALW-001 §4.2"):
+        draft.say("Here's what the policy says about relocation allowances:", "هذا ما تنص عليه السياسة بشأن بدل الانتقال:")
+        draft.policy_line("POL-ALW-001 §4.2" if mt == "LOCATION_INTERNATIONAL" else "POL-ALW-001 §4.1", "• ", "• ")
+    elif mt == "LOCATION_INTERNATIONAL":
         draft.say("For an international move, your relocation allowance is **one month's basic salary, up to AED 25,000**, paid once.",
                   "في الانتقال الدولي، بدل الانتقال هو **راتب أساسي لشهر واحد بحد أقصى 25,000 درهم** يُصرف مرة واحدة.")
         draft.policy_line("POL-ALW-001 §4.2", "• ", "• ")
@@ -351,7 +371,7 @@ def _entitlement(draft, ev, emp):
         draft.policy_line("POL-ALW-001 §4.4", "• ", "• ")
     else:
         settle = "AED 8,000" if emp["family_status"] == "FAMILY" else "AED 5,000"
-        if emp["relocating_from_abroad"] == "true":
+        if emp["relocating_from_abroad"] == "true" and library.same_text("POL-ALW-001 §1.2"):
             draft.say(f"As a new joiner relocating from abroad, you receive a one-off settling-in allowance of **{settle}** with your first salary.",
                       f"بصفتك موظفاً جديداً قادماً من الخارج، تحصل على بدل استقرار لمرة واحدة قدره **{settle}** مع أول راتب.")
             draft.cite("POL-ALW-001 §1.1", "POL-ALW-001 §1.2", "POL-ALW-001 §1.3")

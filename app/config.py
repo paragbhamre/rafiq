@@ -1,18 +1,38 @@
 """Runtime configuration (environment variables) and journey definitions.
 
-Journey definitions mirror data/journey_maps.md. When the official pack arrives, update
-STEPS / ESCALATION_CONTACTS here and the column map in data.py; nothing else should change.
+Which data pack is loaded:
+  RAFIQ_PACK=synthetic (default)  -> data/            (APEX Partners' synthetic pack)
+  RAFIQ_PACK=official             -> packs/official/  (the organisers' pack, once it passes tools/ingest.py)
+  RAFIQ_PACK=<path>               -> any other folder
+RAFIQ_DATA_DIR still overrides everything (kept for compatibility).
+
+The STEPS / STAGES / ESCALATION_CONTACTS below are built-in defaults that mirror the synthetic
+data/journey_maps.md. At start-up they are replaced by whatever the loaded pack's journey_maps.md
+specifies (app/journeymap.py), matched by event code.
 """
 import datetime as dt
+import json
 import os
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-DATA_DIR = Path(os.getenv("RAFIQ_DATA_DIR", ROOT / "data"))
+REFERENCE_DIR = ROOT / "data"          # the synthetic pack, always available as a reference
+PACK_NAME = os.getenv("RAFIQ_PACK", "synthetic")
+_pack_dirs = {"synthetic": REFERENCE_DIR, "official": ROOT / "packs" / "official"}
+DATA_DIR = Path(os.getenv("RAFIQ_DATA_DIR") or _pack_dirs.get(PACK_NAME) or Path(PACK_NAME).expanduser())
+if not DATA_DIR.is_absolute():
+    DATA_DIR = (ROOT / DATA_DIR).resolve()
+IS_REFERENCE_PACK = DATA_DIR.resolve() == REFERENCE_DIR.resolve()
+
+# Optional pack.json in the pack folder: {"as_of": "YYYY-MM-DD", "name": "...", "notes": "..."}
+try:
+    PACK_META = json.loads((DATA_DIR / "pack.json").read_text(encoding="utf-8"))
+except (OSError, ValueError):
+    PACK_META = {}
 RUNTIME_DIR = Path(os.getenv("RAFIQ_RUNTIME_DIR", ROOT / "runtime"))
 
 # "Today" for the prototype. The synthetic pack is built for 2026-10-14.
-AS_OF = dt.date.fromisoformat(os.getenv("RAFIQ_AS_OF", "2026-10-14"))
+AS_OF = dt.date.fromisoformat(os.getenv("RAFIQ_AS_OF") or PACK_META.get("as_of") or "2026-10-14")
 
 # LLM provider: "offline" (deterministic, no external calls), "anthropic", or "openai"
 # ("openai" covers any OpenAI-compatible endpoint, including Azure OpenAI and local gateways).
@@ -118,3 +138,16 @@ REQUEST_TYPES = {
 
 # Personalised entitlements (POL-ALW-001). Amounts in AED.
 HOUSING_ALLOWANCE = {"G1": 4500, "G2": 4500, "G3": 6500, "G4": 6500, "G5": 9000, "G6": 9000}
+
+
+# --------------------------------------------------------------------------
+# Follow the loaded pack's journey_maps.md where it specifies steps, stages and owners
+# --------------------------------------------------------------------------
+from . import journeymap as _jm  # noqa: E402
+
+BUILTIN_STEPS, BUILTIN_STAGES, BUILTIN_CONTACTS = STEPS, STAGES, ESCALATION_CONTACTS
+try:
+    JOURNEY_MAP = _jm.parse((DATA_DIR / "journey_maps.md").read_text(encoding="utf-8"))
+except OSError:
+    JOURNEY_MAP = dict(steps={}, stages={}, contacts={}, notes=["journey_maps.md not found; using built-in journeys"])
+STEPS, STAGES, ESCALATION_CONTACTS = _jm.merge(JOURNEY_MAP, BUILTIN_STEPS, BUILTIN_STAGES, BUILTIN_CONTACTS)

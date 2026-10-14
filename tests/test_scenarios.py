@@ -1,4 +1,7 @@
-"""Scenario tests (data/scenarios.md). Run: python -m pytest -q"""
+"""Scenario tests for the synthetic pack (data/scenarios.md). Run: python -m pytest -q
+
+These name the synthetic people (EMP-1001 ...) and are skipped when another pack is loaded;
+tests/test_any_pack.py holds the checks that apply to any pack."""
 import os
 import tempfile
 
@@ -10,7 +13,9 @@ os.environ["RAFIQ_ADMIN_PASSWORD"] = "test-admin-pass"
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app import auth  # noqa: E402
+from app import auth, config  # noqa: E402
+
+pytestmark = pytest.mark.skipif(not config.IS_REFERENCE_PACK, reason="synthetic-pack scenarios")
 from app.data import state  # noqa: E402
 from app.main import app  # noqa: E402
 

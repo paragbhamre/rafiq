@@ -10,29 +10,42 @@ import threading
 import uuid
 from collections import defaultdict
 
-from . import config
+from pathlib import Path
+
+from . import config, schema
+from .packio import load_table, read_mapping  # noqa: F401  (re-exported)
 
 
 
-def _read_csv(name):
-    path = config.DATA_DIR / name
-    with open(path, encoding="utf-8") as f:
-        return list(csv.DictReader(f))
+class PackError(RuntimeError):
+    pass
 
 
 class Pack:
-    """Read-only synthetic data pack."""
+    """Read-only data pack, normalised to Rafiq's schema."""
 
-    def __init__(self):
-        self.employees = {e["employee_id"]: e for e in _read_csv("employees.csv")}
+    def __init__(self, pack_dir=None, strict=True):
+        self.dir = Path(pack_dir or config.DATA_DIR)
+        self.mapping = read_mapping(self.dir)
+        self.issues = []
+        tables = {}
+        for logical in schema.FILES:
+            rows, issues = load_table(logical, self.dir, self.mapping)
+            tables[logical] = rows
+            self.issues += issues
+        blockers = [i["msg"] for i in self.issues if i["level"] == "BLOCKER"]
+        if blockers and strict:
+            raise PackError("Data pack can't be loaded:\n  - " + "\n  - ".join(blockers) +
+                            "\nRun: python tools/ingest.py " + str(self.dir))
+        self.employees = {e["employee_id"]: e for e in tables["employees"]}
         self.events = defaultdict(list)
-        for r in _read_csv("journey_events.csv"):
+        for r in tables["events"]:
             self.events[r["employee_id"]].append(r)
         self.requests = defaultdict(list)
-        for r in _read_csv("service_requests.csv"):
+        for r in tables["requests"]:
             self.requests[r["employee_id"]].append(r)
         self.pulse = defaultdict(list)
-        for r in _read_csv("pulse_feedback.csv"):
+        for r in tables["pulse"]:
             self.pulse[r["employee_id"]].append(r)
         self.managers = {}
         for e in self.employees.values():

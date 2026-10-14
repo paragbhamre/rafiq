@@ -44,11 +44,11 @@ MAX_FAILS, FAIL_WINDOW_S = 8, 15 * 60
 _fails = defaultdict(deque)
 
 # Accounts listed in the sign-in reference panel (names and usernames only, never their situation)
-FEATURED = ["EMP-1001", "EMP-1002", "EMP-1003", "EMP-1004", "EMP-1005", "EMP-1006", "EMP-1007",
+CURATED_FEATURED = ["EMP-1001", "EMP-1002", "EMP-1003", "EMP-1004", "EMP-1005", "EMP-1006", "EMP-1007",
             "EMP-1008", "EMP-1009", "EMP-1010", "EMP-1011", "EMP-1012", "EMP-1013", "EMP-1014"]
 
 # Suggested first questions, returned by /api/me only to the signed-in employee themself
-SUGGESTIONS = {
+CURATED_SUGGESTIONS = {
     "EMP-1001": ["It's my first week and I still don't have a laptop. What do I do?"],
     "EMP-1002": ["Is my visa on track? I'm meant to fly next week."],
     "EMP-1003": ["When will my relocation allowance be paid?"],
@@ -64,6 +64,86 @@ SUGGESTIONS = {
     "EMP-1013": ["I'm due to start in Singapore tomorrow. Am I good to go?"],
     "EMP-1014": ["متى موعد الفحص الطبي للتأشيرة؟"],
 }
+
+
+
+
+def _pick_demo_accounts():
+    """With the synthetic pack, the curated scenario accounts. With any other pack, pick people whose
+    journeys show each kind of situation (friction, a move, Arabic, consent withdrawn, on track) from
+    the loaded data, and suggest a first question about their most pressing step."""
+    if config.IS_REFERENCE_PACK and all(i in pack.employees for i in CURATED_FEATURED):
+        return list(CURATED_FEATURED), dict(CURATED_SUGGESTIONS)
+    # 1) the pack's own test scenarios, when its scenarios.md names employees and prompts
+    from . import scenarios
+    try:
+        scen = scenarios.parse((config.DATA_DIR / "scenarios.md").read_text(encoding="utf-8"), pack.employees)
+    except OSError:
+        scen = []
+    picks, sugg = [], {}
+    for sc in scen:
+        if sc["employee_id"] not in picks:
+            picks.append(sc["employee_id"])
+        if sc["prompt"]:
+            sugg.setdefault(sc["employee_id"], []).append(sc["prompt"])
+    if len(picks) >= 8:
+        return picks[:20], sugg
+    # 2) otherwise (or to top up) choose from the loaded journeys
+    from .journey import evaluate
+    evs = {}
+    for eid in pack.employees:
+        try:
+            evs[eid] = evaluate(eid)
+        except Exception:  # a broken record must not stop sign-in; the compatibility report lists it
+            continue
+    rank = {"RED": 3, "AMBER": 2, "GREEN": 0}
+    score = lambda i: (rank.get(evs[i]["overall"], 0), len(evs[i]["signals"]))  # noqa: E731
+    by = lambda pred: sorted([i for i in evs if pred(i)], key=score, reverse=True)  # noqa: E731
+    emp = pack.employees
+    worst_seen = set()
+
+    def worst(i):
+        bad = [s for s in evs[i]["steps"] if s["status"] in ("STALLED", "AT_RISK")]
+        return bad[0]["code"] if bad else None
+
+    def take(cands, n=1, distinct=False):
+        k = 0
+        for i in cands:
+            if i in picks or (distinct and worst(i) in worst_seen):
+                continue
+            picks.append(i)
+            worst_seen.add(worst(i))
+            k += 1
+            if k >= n:
+                return
+
+    take(by(lambda i: emp[i]["journey_type"] == "ONBOARDING" and evs[i]["overall"] != "GREEN"), 3, distinct=True)
+    take(by(lambda i: emp[i]["journey_type"] == "ONBOARDING" and evs[i]["journey_day"] < 0 and evs[i]["overall"] != "GREEN"))
+    take(by(lambda i: emp[i]["journey_type"] == "MOBILITY" and emp[i].get("move_type") == "LOCATION_INTERNATIONAL"))
+    take(by(lambda i: emp[i]["journey_type"] == "MOBILITY" and evs[i]["overall"] != "GREEN"), 2, distinct=True)
+    take(by(lambda i: emp[i]["preferred_language"] == "ar"), 2)
+    take(by(lambda i: any(p["consent_status"] == "WITHDRAWN" for p in pack.pulse.get(i, []))))
+    take(by(lambda i: any(p["consent_status"] == "ACTIVE" and str(p["score"]).strip() in ("1", "2") for p in pack.pulse.get(i, []))))
+    take(by(lambda i: evs[i]["overall"] == "GREEN" and emp[i]["journey_type"] == "ONBOARDING"))
+    take(by(lambda i: evs[i]["overall"] == "GREEN" and emp[i]["journey_type"] == "MOBILITY"))
+    picks = picks[:14]
+    for i in picks:
+        if i in sugg:
+            continue
+        ar = emp[i]["preferred_language"] == "ar"
+        bad = [s for s in evs[i]["steps"] if s["status"] in ("STALLED", "AT_RISK")]
+        if bad:
+            sugg[i] = [f"ما وضع {bad[0]['label_ar']}؟" if ar else f"What's happening with \"{bad[0]['label']}\"? It's late."]
+        else:
+            sugg[i] = ["ما هي خطواتي التالية؟" if ar else "What's next for me?"]
+    return picks, sugg
+
+
+FEATURED, SUGGESTIONS = _pick_demo_accounts()
+
+
+def suggestions_for(emp_id):
+    return SUGGESTIONS.get(emp_id, [])
 
 
 def _slug(*parts):

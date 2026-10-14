@@ -74,12 +74,21 @@ def has_arabic(text):
     return bool(re.search(r"[؀-ۿ]", text))
 
 
+CITE_PATTERN = r"[A-Z][A-Z0-9]*(?:-[A-Z0-9]+)* §[\d.]+"     # e.g. POL-IT-001 §5.1, HR-12 §3
+
+
 class PolicyLibrary:
-    def __init__(self):
+    def __init__(self, pack_dir=None):
+        self.dir = (pack_dir or config.DATA_DIR) / "policies"
         self.sections = []      # dict(cite, policy_id, title, heading, text)
         self.policies = {}      # policy_id -> {title, version, owner}
-        for path in sorted((config.DATA_DIR / "policies").glob("*.md")):
-            self._load(path)
+        self.skipped = []       # files in policies/ that aren't markdown (report them)
+        self.fallback = []      # policies with no numbered sections, chunked by paragraph instead
+        for path in sorted(self.dir.glob("*")):
+            if path.suffix.lower() in (".md", ".markdown", ".txt"):
+                self._load(path)
+            elif path.is_file() and not path.name.startswith("."):
+                self.skipped.append(path.name)
         self._index()
 
     def _load(self, path):
@@ -94,6 +103,7 @@ class PolicyLibrary:
         pid = meta.get("policy_id", path.stem.split("_")[0])
         self.policies[pid] = {"policy_id": pid, "title": meta.get("title", pid), "version": meta.get("version", ""),
                               "owner": meta.get("owner", ""), "file": path.name}
+        before = len(self.sections)
         heading, sec_no, table = "", "", []
         for line in body.splitlines():
             line = line.rstrip()
@@ -110,6 +120,27 @@ class PolicyLibrary:
             elif line.startswith("|") and sec_no:
                 table.append(line)
         self._flush_table(pid, heading, sec_no, table)
+        if len(self.sections) == before:
+            self._load_unnumbered(pid, body)
+
+    def _load_unnumbered(self, pid, body):
+        """Policies without '## 1. Heading' / '1.1 text' numbering: one section per paragraph, numbered in order."""
+        self.fallback.append(pid)
+        heading, n = "", 0
+        for para in re.split(r"\n\s*\n", body):
+            para = para.strip()
+            if not para:
+                continue
+            if para.startswith("#"):
+                heading = para.lstrip("#").strip().splitlines()[0]
+                rest = "\n".join(para.splitlines()[1:]).strip()
+                if not rest:
+                    continue
+                para = rest
+            n += 1
+            text = " ".join(l.strip().lstrip("-*• ").strip() for l in para.splitlines())
+            self.sections.append(dict(cite=f"{pid} §{n}", policy_id=pid, title=self.policies[pid]["title"],
+                                      heading=heading, text=text))
 
     def _flush_table(self, pid, heading, sec_no, table):
         rows = [r for r in table if not re.match(r"^\|\s*-", r)]
@@ -161,4 +192,89 @@ class PolicyLibrary:
         return out
 
 
+    # ------------------------------------------------------------------ citation resolution
+    def lookup(self, ref):
+        """Section for a citation written in Rafiq's code (see resolve)."""
+        c = self.resolve(ref)
+        return self.by_cite.get(c) if c else None
+
+    def resolve(self, ref):
+        """Map a citation written against the synthetic reference pack to the same rule in this pack.
+
+        Rafiq's code names rules by their synthetic citation (e.g. "POL-IT-001 §5.1", the loan-device
+        rule). With the synthetic pack loaded that is the answer. With another pack, the rule's text is
+        looked up in the reference pack and the closest section *by meaning* is found here; if nothing
+        is close enough, None (the citation is dropped and the compatibility report lists it).
+        Refs starting with "@" are already citations in this pack.
+        """
+        if not ref:
+            return None
+        if ref.startswith("@"):
+            return ref[1:] if ref[1:] in self.by_cite else None
+        if self is reference:
+            return ref if ref in self.by_cite else None
+        if ref in self._resolved:
+            return self._resolved[ref][0]
+        self._resolved[ref] = self._match(ref)
+        return self._resolved[ref][0]
+
+    def resolution(self, ref):
+        """(cite or None, similarity, how) for the compatibility report."""
+        if self is reference:
+            return (ref, 1.0, "same pack") if ref in self.by_cite else (None, 0.0, "not found")
+        self.resolve(ref)
+        return self._resolved[ref]
+
+    def _match(self, ref):
+        src = reference.by_cite.get(ref)
+        if not src:
+            return (ref, 1.0, "exact") if ref in self.by_cite else (None, 0.0, "unknown citation")
+        want = set(tokenize(src["text"])) | set(tokenize(src["heading"]))
+        best = (None, 0.0)
+        cands = [h["cite"] for h in self.search(f"{src['heading']} {src['text']}", k=6)]
+        if ref in self.by_cite:
+            cands.insert(0, ref)
+        for c in cands:
+            sec = self.by_cite[c]
+            have = set(tokenize(sec["text"])) | set(tokenize(sec["heading"]))
+            sim = len(want & have) / max(1, len(want | have))
+            if sim > best[1]:
+                best = (c, sim)
+        if best[0] and best[1] >= MATCH_THRESHOLD:
+            same = _norm(self.by_cite[best[0]]["text"]) == _norm(src["text"])
+            return (best[0], round(best[1], 2), "identical text" if same else "matched by meaning")
+        return (None, round(best[1], 2), "no close match")
+
+    def same_text(self, *refs):
+        """True when every rule's text is unchanged from the reference pack. Rafiq only states the
+        figures it has built in (e.g. allowance amounts) when this holds; otherwise it quotes the policy."""
+        for r in refs:
+            c = self.resolve(r)
+            src = reference.by_cite.get(r)
+            if not c or not src or _norm(self.by_cite[c]["text"]) != _norm(src["text"]):
+                return False
+        return True
+
+
+MATCH_THRESHOLD = 0.3
+
+
+def _norm(t):
+    return " ".join(TOKEN_RE.findall((t or "").lower()))
+
+
 library = PolicyLibrary()
+reference = library if config.IS_REFERENCE_PACK else PolicyLibrary(config.REFERENCE_DIR)
+library._resolved = {}
+reference._resolved = {}
+
+
+def _attach_step_policies():
+    """Steps the built-in definitions don't know get their related policy sections by search."""
+    for steps in config.STEPS.values():
+        for s in steps:
+            if not s.get("policy"):
+                s["policy"] = ["@" + h["cite"] for h in library.search(s["label"], k=2)]
+
+
+_attach_step_policies()

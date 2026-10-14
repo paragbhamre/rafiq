@@ -84,8 +84,8 @@ def validate(text, allowed, draft):
     def fix(m):
         c = re.sub(r"\s*§\s*", " §", m.group(1).strip()).rstrip(".")
         return f"[{c}]" if c in allowed else ""
-    text = re.sub(r"\[(POL-[A-Z]{2,4}-\d{3}\s*§\s*[\d.]+)\]", fix, text)
-    cited = set(re.findall(r"\[(POL-[A-Z]{2,4}-\d{3} §[\d.]+)\]", text))
+    text = re.sub(r"\[([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)*\s*§\s*[\d.]+)\]", fix, text)
+    cited = set(re.findall(r"\[([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)* §[\d.]+)\]", text))
     if allowed and not cited:
         text += "\n\n" + ("المصادر: " if draft.lang == "ar" else "Sources: ") + ", ".join(f"[{c}]" for c in allowed[:3])
     return text.strip()

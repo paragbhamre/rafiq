@@ -37,7 +37,7 @@ docker run -p 8000:8000 --env-file .env rafiq
 ```bash
 pip install -r requirements.txt
 uvicorn app.main:app --port 8000
-python -m pytest -q          # 38 tests: scenarios, privacy, guardrails, sign-in security, persistence
+python -m pytest -q          # 63 tests: scenarios, privacy, guardrails, sign-in security, persistence, pack swap kit
 DATABASE_URL=postgresql://user@host/db python -m pytest -q   # same suite against Postgres
 ```
 
@@ -101,10 +101,17 @@ All colours, fonts, radii and shadows live in one file, `static/theme.css`. The 
 
 ## Swapping in the official data pack
 
-1. Drop the official files into `data/` (same file names).
-2. If column names differ, map them in `app/data.py` (the loader).
-3. Update `STEPS` and `ESCALATION_CONTACTS` in `app/config.py` from the official `journey_maps.md`.
-4. Run `python -m pytest -q`, then add tests for any new cases the official pack reveals.
+Rafiq reads the pack it is pointed at (`RAFIQ_PACK=synthetic|official|<folder>`) and adapts to it: renames go in a
+`mapping.json`, journeys and named owners are read from the pack's `journey_maps.md`, policy rules are found in the
+official policies by their text, and demo accounts come from the pack's `scenarios.md`. One command checks a pack
+and lists anything that needs attention:
+
+```bash
+python tools/ingest.py packs/official
+```
+
+Full runbook: [`packs/README.md`](packs/README.md). A rehearsal pack that differs in every way
+(`tools/make_test_pack.py`) is checked on every build.
 
 ## Path to a pilot (next quarter)
 
