@@ -5,7 +5,7 @@ const T = {
   en: {
     tagline: "Employee journey companion", role_employee: "Employee", role_manager: "Manager", role_hrbp: "HR partner",
     role_owner: "Service owner", role_insights: "Insights", viewing_as: "Viewing as",
-    banner: "<strong>Prototype.</strong> Synthetic data only. Today is set to {asof}. AI writer: {llm}.",
+    banner: "<strong>Prototype.</strong> Synthetic data only. Today is set to {asof}.",
     your_journey: "Your journey", requests: "Your requests", updates: "Updates", my_data: "My data",
     ask: "Ask Rafiq about your journey, a policy, or something that's stuck…", send: "Send", thinking: "Rafiq is checking your journey…",
     onboarding: "Onboarding", mobility: "Internal move", start: "Offer accepted", join: "Joining day", day30: "Day 30",
@@ -23,7 +23,7 @@ const T = {
   ar: {
     tagline: "رفيق رحلة الموظف", role_employee: "الموظف", role_manager: "المدير", role_hrbp: "شريك الموارد البشرية",
     role_owner: "مالك الخدمة", role_insights: "المؤشرات", viewing_as: "العرض بصفة",
-    banner: "<strong>نموذج أولي.</strong> بيانات افتراضية فقط. تاريخ اليوم مضبوط على {asof}. محرّك الصياغة: {llm}.",
+    banner: "<strong>نموذج أولي.</strong> بيانات افتراضية فقط. تاريخ اليوم مضبوط على {asof}.",
     your_journey: "رحلتك", requests: "طلباتك", updates: "التحديثات", my_data: "بياناتي",
     ask: "اسأل رفيق عن رحلتك أو عن سياسة أو عن أمر متأخر…", send: "إرسال", thinking: "رفيق يراجع رحلتك…",
     onboarding: "الالتحاق", mobility: "الانتقال الداخلي", start: "قبول العرض", join: "يوم الالتحاق", day30: "اليوم 30",
@@ -86,9 +86,7 @@ async function boot() {
   if (me.ok) { signedIn(await me.json()); } else { showLogin(); }
 }
 function renderBanner() {
-  const l = S.health.llm; const ar = S.lang === "ar";
-  const llm = l.provider === "offline" ? (ar ? "وضع حتمي بدون اتصال" : "offline deterministic mode") : `${l.provider} ${l.model}${l.configured ? "" : " (no key, using offline)"}`;
-  $("#banner").innerHTML = `<span>${t("banner", { asof: S.health.as_of, llm: esc(llm) })}</span>`;
+  $("#banner").innerHTML = `<span>${t("banner", { asof: S.health.as_of })}</span>`;
 }
 const ROLE_LABEL = { employee: ["Employee", "موظف"], manager: ["Manager", "مدير"], hrbp: ["HR partner", "شريك الموارد البشرية"], owner: ["Service owner", "مالك الخدمة"], admin: ["Admin", "المسؤول"] };
 const ICON = {

@@ -72,7 +72,7 @@ def require_role(*roles):
 # --------------------------------------------------------------------------
 @app.get("/api/health")
 def health():
-    return {"ok": True, "as_of": config.AS_OF.isoformat(), "llm": llm.status(), "storage": state.health(),
+    return {"ok": True, "as_of": config.AS_OF.isoformat(), "ai_writer": llm.status()["configured"], "storage": state.health(),
             "employees": len(pack.employees), "synthetic_data": True}
 
 

@@ -244,7 +244,7 @@ def test_llm_writer_citations_validated_and_fallback(monkeypatch):
     # model invents a citation and drops the real one -> invented one removed, real sources re-attached
     monkeypatch.setattr(llm, "_anthropic", lambda system, msgs: "You can get a loan laptop today [POL-XYZ-999 §1.1].")
     out = companion.chat("EMP-1001", "I still don't have a laptop")
-    assert out["mode"] == "anthropic"
+    assert out["mode"] == "ai"
     assert "POL-XYZ-999" not in out["reply"] and "[POL-" in out["reply"]
     # provider failure -> deterministic draft is returned
     def boom(system, msgs):

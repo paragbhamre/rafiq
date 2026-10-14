@@ -21,7 +21,7 @@ Deployed on Render from this repository using `render.yaml` (Docker, Frankfurt r
 - On the **free** plan the app sleeps after 15 minutes idle, and the first visit then takes about 50 seconds. Switch to **Starter** during judging.
 - **Data storage.** The synthetic pack is read-only files in `data/`. Everything created while using the app lives in **Render Postgres** (`rafiq-db`, Frankfurt, private network only, no public access): `requests`, `cases`, `consent_events` (append-only), `audit_log` (append-only), `notifications`, `conversations`, `request_priority` and `flags`. It survives sleeps and redeploys, and is safe with more than one instance (early warnings are seeded once, under a Postgres advisory lock). Locally, without `DATABASE_URL`, a JSON file is used instead.
 - Demo data is shared by all accounts. Sign in as `admin` to reset it to the starting state.
-- The AI writer uses `LLM_PROVIDER=anthropic` with `ANTHROPIC_API_KEY` set in Render. Without a key it falls back to offline mode automatically.
+- The optional AI writer is configured by environment variables in Render (see `.env.example`). Without them, or if the provider fails, Rafiq answers in offline mode automatically.
 
 ## Run it
 
@@ -29,8 +29,8 @@ Deployed on Render from this repository using `render.yaml` (Docker, Frankfurt r
 ```bash
 docker build -t rafiq .
 docker run -p 8000:8000 rafiq                 # offline mode, no keys needed
-# with Claude as the writer:
-docker run -p 8000:8000 -e LLM_PROVIDER=anthropic -e ANTHROPIC_API_KEY=<key> rafiq
+# with the AI writer: pass the provider settings from .env.example
+docker run -p 8000:8000 --env-file .env rafiq
 ```
 
 **Local Python (3.11+)**
@@ -78,7 +78,7 @@ static/  (vanilla JS, no build)          app/
   Insights | EN/AR RTL                     journey.py    stage, step status, friction signals (rules)
         │  X-Rafiq-Role / User headers      policies.py   section index + BM25 + Arabic glossary
         ▼  (SSO claims in a pilot)          companion.py  guardrails → router → grounded draft
-  /api/employee/{id}/chat ───────────────▶  llm.py        optional writer: Anthropic / OpenAI-compatible / Azure
+  /api/employee/{id}/chat ───────────────▶  llm.py        optional writer: any approved provider (configured by environment)
   /api/employee/{id}/actions ────────────▶  agents.py     service agents + named-owner cases
   /api/cases  /api/manager  /api/insights   data.py       read-only pack
   store.py      runtime state: PostgreSQL (DATABASE_URL) or local JSON

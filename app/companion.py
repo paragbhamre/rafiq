@@ -657,7 +657,7 @@ def chat(emp_id, msg, ui_lang="en"):
     if config.LLM_PROVIDER != "offline" and not draft.refused:
         written = llm.rewrite(emp_id, msg, draft, ev, history=_history(emp_id))
         if written:
-            text, mode = written, config.LLM_PROVIDER
+            text, mode = written, "ai"
         else:
             mode = "offline_fallback"
     cites = [dict(cite=c, **{k: library.get(c)[k] for k in ("title", "heading", "text")}) for c in draft.cites]
