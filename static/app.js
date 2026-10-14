@@ -126,7 +126,6 @@ async function showLogin() {
   $("#view").innerHTML = `
   <div class="login">
     <section class="login-card panel" aria-labelledby="signinTitle">
-      <div class="login-mark"><svg class="mark mark-lg" viewBox="0 0 64 64" aria-hidden="true" focusable="false"><path class="mark-bubble" d="M14 8H50a8 8 0 0 1 8 8V40a8 8 0 0 1-8 8H30L18 58V48H14a8 8 0 0 1-8-8V16a8 8 0 0 1 8-8Z"/><path class="mark-route" d="M17 36C26 36 26 20 38 20"/><circle class="mark-start" cx="17" cy="36" r="3.5"/><circle class="mark-dest" cx="44" cy="20" r="6"/></svg></div>
       <h1 id="signinTitle">${L("Sign in", "تسجيل الدخول")}</h1>
       <p class="login-sub">${L("Your onboarding and move, in one place.", "رحلة انضمامك وانتقالك في مكان واحد.")}</p>
       <form id="loginForm" autocomplete="on">

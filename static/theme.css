@@ -15,8 +15,6 @@
   --accent-soft: #f8e9eb;     /* tinted backgrounds for accent elements */
   --gold: #a6814c;            /* hairlines and quiet detail (journey path, dividers) */
 
-  --mark-route: #c9a46a;      /* route line inside the logo (lighter gold for contrast on ink) */
-
   /* Neutrals */
   --ink: #1d1d1f;             /* primary text, dark surfaces */
   --ink-2: #44444a;           /* secondary text */
