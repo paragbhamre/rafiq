@@ -1,0 +1,159 @@
+response_id,employee_id,submitted_at,journey_type,journey_stage,question_id,question_text,score,comment,language,consent_status
+PLS-00001,EMP-1001,2026-10-12T12:15:00+04:00,ONBOARDING,FIRST_WEEK,Q2,How supported do you feel right now? (1-5),2,"I've been here three days and still have no laptop, so I can't do any training.",en,ACTIVE
+PLS-00002,EMP-1003,2026-10-07T13:50:00+04:00,MOBILITY,PRE_MOVE,Q1,How clear is what happens next in your journey? (1-5),3,Excited about London but not sure when my allowance will be paid.,en,ACTIVE
+PLS-00003,EMP-1005,2026-10-08T16:45:00+04:00,ONBOARDING,FIRST_WEEK,Q1,How clear is what happens next in your journey? (1-5),2,Nobody told me where to go on my first day.,en,ACTIVE
+PLS-00004,EMP-1005,2026-10-13T14:50:00+04:00,ONBOARDING,FIRST_MONTH,Q2,How supported do you feel right now? (1-5),1,"Feeling a bit lost, nobody has followed up. I still don't have a buddy.",en,ACTIVE
+PLS-00005,EMP-1006,2026-09-27T10:00:00+04:00,ONBOARDING,FIRST_WEEK,Q2,How supported do you feel right now? (1-5),1,Very unhappy with my manager so far.,en,WITHDRAWN
+PLS-00006,EMP-1006,2026-10-08T19:45:00+04:00,ONBOARDING,FIRST_MONTH,Q1,How clear is what happens next in your journey? (1-5),2,Thinking about whether this was the right move.,en,WITHDRAWN
+PLS-00007,EMP-1007,2026-10-06T19:15:00+04:00,ONBOARDING,FIRST_WEEK,Q1,How clear is what happens next in your journey? (1-5),4,التعريف بالشركة كان منظماً جداً.,ar,ACTIVE
+PLS-00008,EMP-1009,2026-10-05T18:10:00+04:00,ONBOARDING,FIRST_WEEK,Q1,How clear is what happens next in your journey? (1-5),5,"Everything has been smooth so far, thank you.",en,ACTIVE
+PLS-00009,EMP-1010,2026-10-13T12:00:00+04:00,MOBILITY,IN_NEW_ROLE,Q2,How supported do you feel right now? (1-5),2,Started at DWC but can't access the rostering system.,en,ACTIVE
+PLS-00010,EMP-1011,2026-10-13T09:40:00+04:00,ONBOARDING,FIRST_MONTH,Q2,How supported do you feel right now? (1-5),3,"Mostly fine, but I am not always sure who to contact.",en,ACTIVE
+PLS-00011,EMP-1115,2026-10-01T13:40:00+04:00,ONBOARDING,FIRST_MONTH,Q1,How clear is what happens next in your journey? (1-5),5,"Everything has been smooth so far, thank you.",en,WITHDRAWN
+PLS-00012,EMP-1116,2026-09-05T12:10:00+04:00,ONBOARDING,FIRST_WEEK,Q2,How supported do you feel right now? (1-5),4,كل شيء يسير بسلاسة حتى الآن، شكراً.,ar,ACTIVE
+PLS-00013,EMP-1116,2026-09-16T17:15:00+04:00,ONBOARDING,FIRST_MONTH,Q2,How supported do you feel right now? (1-5),5,كل شيء يسير بسلاسة حتى الآن، شكراً.,ar,ACTIVE
+PLS-00014,EMP-1116,2026-09-30T16:30:00+04:00,ONBOARDING,FIRST_MONTH,Q2,How supported do you feel right now? (1-5),5,التعريف بالشركة كان منظماً جداً.,ar,ACTIVE
+PLS-00015,EMP-1117,2026-10-04T11:40:00+04:00,ONBOARDING,FIRST_WEEK,Q1,How clear is what happens next in your journey? (1-5),3,بعض الإجراءات استغرقت وقتاً أطول من المتوقع.,ar,ACTIVE
+PLS-00016,EMP-1125,2026-10-09T10:50:00+04:00,ONBOARDING,FIRST_WEEK,Q1,How clear is what happens next in your journey? (1-5),4,كل شيء يسير بسلاسة حتى الآن، شكراً.,ar,ACTIVE
+PLS-00017,EMP-1126,2026-10-13T19:50:00+04:00,ONBOARDING,FIRST_WEEK,Q2,How supported do you feel right now? (1-5),3,"Mostly fine, but I am not always sure who to contact.",en,ACTIVE
+PLS-00018,EMP-1129,2026-08-29T13:00:00+04:00,ONBOARDING,FIRST_WEEK,Q1,How clear is what happens next in your journey? (1-5),4,"Everything has been smooth so far, thank you.",en,ACTIVE
+PLS-00019,EMP-1129,2026-09-23T11:00:00+04:00,ONBOARDING,FIRST_MONTH,Q2,How supported do you feel right now? (1-5),5,,en,ACTIVE
+PLS-00020,EMP-1135,2026-09-21T16:20:00+04:00,ONBOARDING,FIRST_WEEK,Q2,How supported do you feel right now? (1-5),5,كل شيء يسير بسلاسة حتى الآن، شكراً.,ar,ACTIVE
+PLS-00021,EMP-1135,2026-10-02T19:00:00+04:00,ONBOARDING,FIRST_MONTH,Q1,How clear is what happens next in your journey? (1-5),4,,ar,ACTIVE
+PLS-00022,EMP-1137,2026-09-15T10:00:00+04:00,ONBOARDING,FIRST_WEEK,Q1,How clear is what happens next in your journey? (1-5),4,,en,ACTIVE
+PLS-00023,EMP-1139,2026-10-14T16:00:00+04:00,ONBOARDING,FIRST_WEEK,Q1,How clear is what happens next in your journey? (1-5),4,التعريف بالشركة كان منظماً جداً.,ar,ACTIVE
+PLS-00024,EMP-1140,2026-09-21T18:10:00+04:00,ONBOARDING,FIRST_WEEK,Q1,How clear is what happens next in your journey? (1-5),4,"Everything has been smooth so far, thank you.",en,ACTIVE
+PLS-00025,EMP-1140,2026-10-02T11:00:00+04:00,ONBOARDING,FIRST_MONTH,Q1,How clear is what happens next in your journey? (1-5),4,,en,ACTIVE
+PLS-00026,EMP-1142,2026-08-24T16:50:00+04:00,ONBOARDING,FIRST_WEEK,Q1,How clear is what happens next in your journey? (1-5),3,A few things took longer than expected.,en,ACTIVE
+PLS-00027,EMP-1142,2026-09-04T09:40:00+04:00,ONBOARDING,FIRST_MONTH,Q2,How supported do you feel right now? (1-5),3,It would help to have one place to see what is pending.,en,ACTIVE
+PLS-00028,EMP-1145,2026-09-10T09:50:00+04:00,ONBOARDING,FIRST_WEEK,Q2,How supported do you feel right now? (1-5),5,,en,ACTIVE
+PLS-00029,EMP-1145,2026-09-21T12:20:00+04:00,ONBOARDING,FIRST_MONTH,Q1,How clear is what happens next in your journey? (1-5),5,,en,ACTIVE
+PLS-00030,EMP-1145,2026-10-05T16:20:00+04:00,ONBOARDING,FIRST_MONTH,Q1,How clear is what happens next in your journey? (1-5),4,My buddy has been really helpful.,en,ACTIVE
+PLS-00031,EMP-1149,2026-09-17T17:50:00+04:00,ONBOARDING,FIRST_WEEK,Q2,How supported do you feel right now? (1-5),5,Clear communication from HR.,en,ACTIVE
+PLS-00032,EMP-1150,2026-08-22T15:00:00+04:00,ONBOARDING,FIRST_WEEK,Q1,How clear is what happens next in your journey? (1-5),5,"Everything has been smooth so far, thank you.",en,ACTIVE
+PLS-00033,EMP-1150,2026-09-02T14:40:00+04:00,ONBOARDING,FIRST_MONTH,Q2,How supported do you feel right now? (1-5),5,Clear communication from HR.,en,ACTIVE
+PLS-00034,EMP-1151,2026-09-13T11:20:00+04:00,ONBOARDING,FIRST_MONTH,Q2,How supported do you feel right now? (1-5),4,,en,ACTIVE
+PLS-00035,EMP-1154,2026-08-21T13:30:00+04:00,ONBOARDING,FIRST_WEEK,Q2,How supported do you feel right now? (1-5),5,,en,ACTIVE
+PLS-00036,EMP-1154,2026-09-01T19:45:00+04:00,ONBOARDING,FIRST_MONTH,Q1,How clear is what happens next in your journey? (1-5),4,My buddy has been really helpful.,en,ACTIVE
+PLS-00037,EMP-1154,2026-09-15T09:10:00+04:00,ONBOARDING,FIRST_MONTH,Q1,How clear is what happens next in your journey? (1-5),5,"Everything has been smooth so far, thank you.",en,ACTIVE
+PLS-00038,EMP-1155,2026-08-31T14:10:00+04:00,ONBOARDING,FIRST_MONTH,Q2,How supported do you feel right now? (1-5),5,Induction was well organised.,en,ACTIVE
+PLS-00039,EMP-1155,2026-09-14T12:30:00+04:00,ONBOARDING,FIRST_MONTH,Q2,How supported do you feel right now? (1-5),4,,en,ACTIVE
+PLS-00040,EMP-1156,2026-09-29T11:45:00+04:00,ONBOARDING,FIRST_WEEK,Q1,How clear is what happens next in your journey? (1-5),5,كل شيء يسير بسلاسة حتى الآن، شكراً.,ar,ACTIVE
+PLS-00041,EMP-1160,2026-09-20T13:15:00+04:00,ONBOARDING,FIRST_WEEK,Q1,How clear is what happens next in your journey? (1-5),4,التعريف بالشركة كان منظماً جداً.,ar,ACTIVE
+PLS-00042,EMP-1162,2026-08-31T13:50:00+04:00,ONBOARDING,FIRST_WEEK,Q1,How clear is what happens next in your journey? (1-5),4,"Everything has been smooth so far, thank you.",en,ACTIVE
+PLS-00043,EMP-1162,2026-09-11T10:50:00+04:00,ONBOARDING,FIRST_MONTH,Q1,How clear is what happens next in your journey? (1-5),4,Clear communication from HR.,en,ACTIVE
+PLS-00044,EMP-1164,2026-09-07T11:50:00+04:00,ONBOARDING,FIRST_WEEK,Q2,How supported do you feel right now? (1-5),5,Induction was well organised.,en,ACTIVE
+PLS-00045,EMP-1164,2026-09-18T16:20:00+04:00,ONBOARDING,FIRST_MONTH,Q2,How supported do you feel right now? (1-5),4,Clear communication from HR.,en,ACTIVE
+PLS-00046,EMP-1167,2026-08-18T10:45:00+04:00,ONBOARDING,FIRST_WEEK,Q2,How supported do you feel right now? (1-5),4,"Everything has been smooth so far, thank you.",en,ACTIVE
+PLS-00047,EMP-1167,2026-09-12T16:00:00+04:00,ONBOARDING,FIRST_MONTH,Q2,How supported do you feel right now? (1-5),4,Clear communication from HR.,en,ACTIVE
+PLS-00048,EMP-1169,2026-10-05T10:45:00+04:00,ONBOARDING,FIRST_WEEK,Q1,How clear is what happens next in your journey? (1-5),3,"Mostly fine, but I am not always sure who to contact.",en,ACTIVE
+PLS-00049,EMP-1170,2026-10-03T12:45:00+04:00,ONBOARDING,FIRST_MONTH,Q1,How clear is what happens next in your journey? (1-5),3,A few things took longer than expected.,en,ACTIVE
+PLS-00050,EMP-1171,2026-08-31T13:00:00+04:00,ONBOARDING,FIRST_WEEK,Q1,How clear is what happens next in your journey? (1-5),5,,en,ACTIVE
+PLS-00051,EMP-1171,2026-09-11T14:40:00+04:00,ONBOARDING,FIRST_MONTH,Q2,How supported do you feel right now? (1-5),4,"Everything has been smooth so far, thank you.",en,ACTIVE
+PLS-00052,EMP-1171,2026-09-25T19:20:00+04:00,ONBOARDING,FIRST_MONTH,Q1,How clear is what happens next in your journey? (1-5),4,,en,ACTIVE
+PLS-00053,EMP-1178,2026-10-08T14:10:00+04:00,ONBOARDING,FIRST_MONTH,Q1,How clear is what happens next in your journey? (1-5),5,,en,ACTIVE
+PLS-00054,EMP-1179,2026-10-13T15:10:00+04:00,ONBOARDING,FIRST_WEEK,Q2,How supported do you feel right now? (1-5),3,It would help to have one place to see what is pending.,en,ACTIVE
+PLS-00055,EMP-1184,2026-09-09T13:50:00+04:00,ONBOARDING,FIRST_WEEK,Q2,How supported do you feel right now? (1-5),3,,en,ACTIVE
+PLS-00056,EMP-1184,2026-09-20T19:15:00+04:00,ONBOARDING,FIRST_MONTH,Q2,How supported do you feel right now? (1-5),5,Induction was well organised.,en,ACTIVE
+PLS-00057,EMP-1184,2026-10-04T18:00:00+04:00,ONBOARDING,FIRST_MONTH,Q2,How supported do you feel right now? (1-5),3,,en,ACTIVE
+PLS-00058,EMP-1187,2026-10-01T10:20:00+04:00,ONBOARDING,FIRST_WEEK,Q2,How supported do you feel right now? (1-5),5,Induction was well organised.,en,ACTIVE
+PLS-00059,EMP-1189,2026-09-25T13:15:00+04:00,ONBOARDING,FIRST_WEEK,Q1,How clear is what happens next in your journey? (1-5),4,"Everything has been smooth so far, thank you.",en,ACTIVE
+PLS-00060,EMP-1189,2026-10-06T17:40:00+04:00,ONBOARDING,FIRST_MONTH,Q1,How clear is what happens next in your journey? (1-5),5,"Everything has been smooth so far, thank you.",en,ACTIVE
+PLS-00061,EMP-1195,2026-09-18T14:50:00+04:00,ONBOARDING,FIRST_WEEK,Q2,How supported do you feel right now? (1-5),4,Clear communication from HR.,en,ACTIVE
+PLS-00062,EMP-1197,2026-09-07T09:45:00+04:00,ONBOARDING,FIRST_WEEK,Q1,How clear is what happens next in your journey? (1-5),3,,en,ACTIVE
+PLS-00063,EMP-1197,2026-09-18T14:20:00+04:00,ONBOARDING,FIRST_MONTH,Q1,How clear is what happens next in your journey? (1-5),4,My buddy has been really helpful.,en,ACTIVE
+PLS-00064,EMP-1197,2026-10-02T14:50:00+04:00,ONBOARDING,FIRST_MONTH,Q1,How clear is what happens next in your journey? (1-5),5,,en,ACTIVE
+PLS-00065,EMP-1200,2026-09-25T11:15:00+04:00,ONBOARDING,FIRST_WEEK,Q2,How supported do you feel right now? (1-5),4,Clear communication from HR.,en,ACTIVE
+PLS-00066,EMP-1200,2026-10-06T10:00:00+04:00,ONBOARDING,FIRST_MONTH,Q1,How clear is what happens next in your journey? (1-5),4,Induction was well organised.,en,ACTIVE
+PLS-00067,EMP-1201,2026-09-28T19:50:00+04:00,ONBOARDING,FIRST_WEEK,Q2,How supported do you feel right now? (1-5),4,"Everything has been smooth so far, thank you.",en,ACTIVE
+PLS-00068,EMP-1201,2026-10-09T12:15:00+04:00,ONBOARDING,FIRST_MONTH,Q2,How supported do you feel right now? (1-5),5,,en,ACTIVE
+PLS-00069,EMP-1205,2026-10-05T11:15:00+04:00,ONBOARDING,FIRST_WEEK,Q1,How clear is what happens next in your journey? (1-5),1,Still waiting on things that were promised last week.,en,ACTIVE
+PLS-00070,EMP-1208,2026-09-13T11:20:00+04:00,ONBOARDING,FIRST_WEEK,Q2,How supported do you feel right now? (1-5),4,,en,ACTIVE
+PLS-00071,EMP-1208,2026-09-24T09:40:00+04:00,ONBOARDING,FIRST_MONTH,Q1,How clear is what happens next in your journey? (1-5),3,"Mostly fine, but I am not always sure who to contact.",en,ACTIVE
+PLS-00072,EMP-1208,2026-10-08T14:10:00+04:00,ONBOARDING,FIRST_MONTH,Q2,How supported do you feel right now? (1-5),4,"Everything has been smooth so far, thank you.",en,ACTIVE
+PLS-00073,EMP-1220,2026-09-20T11:50:00+04:00,ONBOARDING,FIRST_MONTH,Q1,How clear is what happens next in your journey? (1-5),3,بعض الإجراءات استغرقت وقتاً أطول من المتوقع.,ar,ACTIVE
+PLS-00074,EMP-1220,2026-10-04T17:30:00+04:00,ONBOARDING,FIRST_MONTH,Q2,How supported do you feel right now? (1-5),4,كل شيء يسير بسلاسة حتى الآن، شكراً.,ar,ACTIVE
+PLS-00075,EMP-1225,2026-09-03T16:30:00+04:00,ONBOARDING,FIRST_WEEK,Q2,How supported do you feel right now? (1-5),4,,en,ACTIVE
+PLS-00076,EMP-1225,2026-09-14T12:20:00+04:00,ONBOARDING,FIRST_MONTH,Q1,How clear is what happens next in your journey? (1-5),5,,en,ACTIVE
+PLS-00077,EMP-1225,2026-09-28T10:45:00+04:00,ONBOARDING,FIRST_MONTH,Q2,How supported do you feel right now? (1-5),4,,en,ACTIVE
+PLS-00078,EMP-1230,2026-09-28T11:45:00+04:00,MOBILITY,APPROVALS,Q2,How supported do you feel right now? (1-5),5,My buddy has been really helpful.,en,ACTIVE
+PLS-00079,EMP-1230,2026-10-10T11:15:00+04:00,MOBILITY,PRE_MOVE,Q1,How clear is what happens next in your journey? (1-5),4,Induction was well organised.,en,ACTIVE
+PLS-00080,EMP-1231,2026-09-16T10:30:00+04:00,MOBILITY,APPROVALS,Q2,How supported do you feel right now? (1-5),3,A few things took longer than expected.,en,ACTIVE
+PLS-00081,EMP-1231,2026-09-28T15:45:00+04:00,MOBILITY,PRE_MOVE,Q1,How clear is what happens next in your journey? (1-5),4,,en,ACTIVE
+PLS-00082,EMP-1232,2026-09-24T19:30:00+04:00,MOBILITY,APPROVALS,Q2,How supported do you feel right now? (1-5),4,My buddy has been really helpful.,en,ACTIVE
+PLS-00083,EMP-1232,2026-10-06T18:40:00+04:00,MOBILITY,PRE_MOVE,Q1,How clear is what happens next in your journey? (1-5),4,"Everything has been smooth so far, thank you.",en,ACTIVE
+PLS-00084,EMP-1233,2026-09-09T16:15:00+04:00,MOBILITY,PRE_MOVE,Q1,How clear is what happens next in your journey? (1-5),4,,en,ACTIVE
+PLS-00085,EMP-1233,2026-09-24T10:30:00+04:00,MOBILITY,IN_NEW_ROLE,Q1,How clear is what happens next in your journey? (1-5),4,My buddy has been really helpful.,en,ACTIVE
+PLS-00086,EMP-1235,2026-09-29T14:50:00+04:00,MOBILITY,APPROVALS,Q1,How clear is what happens next in your journey? (1-5),5,"Everything has been smooth so far, thank you.",en,ACTIVE
+PLS-00087,EMP-1235,2026-10-11T09:00:00+04:00,MOBILITY,PRE_MOVE,Q1,How clear is what happens next in your journey? (1-5),3,"Mostly fine, but I am not always sure who to contact.",en,ACTIVE
+PLS-00088,EMP-1236,2026-09-02T14:45:00+04:00,MOBILITY,APPROVALS,Q1,How clear is what happens next in your journey? (1-5),4,,en,ACTIVE
+PLS-00089,EMP-1236,2026-09-29T17:50:00+04:00,MOBILITY,IN_NEW_ROLE,Q1,How clear is what happens next in your journey? (1-5),5,,en,ACTIVE
+PLS-00090,EMP-1237,2026-09-03T13:40:00+04:00,MOBILITY,APPROVALS,Q1,How clear is what happens next in your journey? (1-5),3,"Mostly fine, but I am not always sure who to contact.",en,ACTIVE
+PLS-00091,EMP-1237,2026-09-15T15:15:00+04:00,MOBILITY,PRE_MOVE,Q2,How supported do you feel right now? (1-5),4,,en,ACTIVE
+PLS-00092,EMP-1237,2026-09-30T13:40:00+04:00,MOBILITY,IN_NEW_ROLE,Q2,How supported do you feel right now? (1-5),4,,en,ACTIVE
+PLS-00093,EMP-1241,2026-09-01T12:40:00+04:00,MOBILITY,APPROVALS,Q1,How clear is what happens next in your journey? (1-5),4,,en,ACTIVE
+PLS-00094,EMP-1241,2026-09-13T09:45:00+04:00,MOBILITY,PRE_MOVE,Q1,How clear is what happens next in your journey? (1-5),5,My buddy has been really helpful.,en,ACTIVE
+PLS-00095,EMP-1242,2026-09-28T14:10:00+04:00,MOBILITY,APPROVALS,Q1,How clear is what happens next in your journey? (1-5),3,,en,ACTIVE
+PLS-00096,EMP-1242,2026-10-10T11:00:00+04:00,MOBILITY,PRE_MOVE,Q2,How supported do you feel right now? (1-5),4,My buddy has been really helpful.,en,ACTIVE
+PLS-00097,EMP-1243,2026-09-08T09:15:00+04:00,MOBILITY,APPROVALS,Q2,How supported do you feel right now? (1-5),4,,en,ACTIVE
+PLS-00098,EMP-1243,2026-09-20T11:15:00+04:00,MOBILITY,PRE_MOVE,Q1,How clear is what happens next in your journey? (1-5),5,,en,ACTIVE
+PLS-00099,EMP-1243,2026-10-05T10:00:00+04:00,MOBILITY,IN_NEW_ROLE,Q2,How supported do you feel right now? (1-5),4,Induction was well organised.,en,ACTIVE
+PLS-00100,EMP-1244,2026-08-29T14:45:00+04:00,MOBILITY,APPROVALS,Q2,How supported do you feel right now? (1-5),4,Induction was well organised.,en,ACTIVE
+PLS-00101,EMP-1244,2026-09-10T19:50:00+04:00,MOBILITY,PRE_MOVE,Q1,How clear is what happens next in your journey? (1-5),5,"Everything has been smooth so far, thank you.",en,ACTIVE
+PLS-00102,EMP-1245,2026-09-17T10:30:00+04:00,MOBILITY,APPROVALS,Q1,How clear is what happens next in your journey? (1-5),4,Clear communication from HR.,en,ACTIVE
+PLS-00103,EMP-1245,2026-09-29T16:10:00+04:00,MOBILITY,PRE_MOVE,Q2,How supported do you feel right now? (1-5),5,My buddy has been really helpful.,en,ACTIVE
+PLS-00104,EMP-1245,2026-10-14T13:45:00+04:00,MOBILITY,IN_NEW_ROLE,Q1,How clear is what happens next in your journey? (1-5),4,,en,ACTIVE
+PLS-00105,EMP-1246,2026-09-21T14:30:00+04:00,MOBILITY,APPROVALS,Q1,How clear is what happens next in your journey? (1-5),5,,en,ACTIVE
+PLS-00106,EMP-1246,2026-10-03T19:45:00+04:00,MOBILITY,PRE_MOVE,Q2,How supported do you feel right now? (1-5),4,Clear communication from HR.,en,ACTIVE
+PLS-00107,EMP-1248,2026-08-28T13:10:00+04:00,MOBILITY,APPROVALS,Q1,How clear is what happens next in your journey? (1-5),5,My buddy has been really helpful.,en,ACTIVE
+PLS-00108,EMP-1248,2026-09-09T17:45:00+04:00,MOBILITY,PRE_MOVE,Q2,How supported do you feel right now? (1-5),4,Induction was well organised.,en,ACTIVE
+PLS-00109,EMP-1249,2026-09-24T13:10:00+04:00,MOBILITY,APPROVALS,Q2,How supported do you feel right now? (1-5),4,My buddy has been really helpful.,en,ACTIVE
+PLS-00110,EMP-1251,2026-10-05T10:20:00+04:00,MOBILITY,IN_NEW_ROLE,Q1,How clear is what happens next in your journey? (1-5),5,,en,WITHDRAWN
+PLS-00111,EMP-1253,2026-10-11T14:30:00+04:00,MOBILITY,APPROVALS,Q2,How supported do you feel right now? (1-5),4,,en,ACTIVE
+PLS-00112,EMP-1257,2026-09-06T10:40:00+04:00,MOBILITY,APPROVALS,Q1,How clear is what happens next in your journey? (1-5),3,It would help to have one place to see what is pending.,en,ACTIVE
+PLS-00113,EMP-1257,2026-09-18T10:00:00+04:00,MOBILITY,PRE_MOVE,Q1,How clear is what happens next in your journey? (1-5),5,Clear communication from HR.,en,ACTIVE
+PLS-00114,EMP-1257,2026-10-03T17:40:00+04:00,MOBILITY,IN_NEW_ROLE,Q1,How clear is what happens next in your journey? (1-5),5,Induction was well organised.,en,ACTIVE
+PLS-00115,EMP-1259,2026-09-20T17:15:00+04:00,MOBILITY,APPROVALS,Q1,How clear is what happens next in your journey? (1-5),4,,en,ACTIVE
+PLS-00116,EMP-1260,2026-09-24T09:50:00+04:00,MOBILITY,APPROVALS,Q2,How supported do you feel right now? (1-5),2,ما زلت أنتظر أموراً وُعدت بها الأسبوع الماضي.,ar,ACTIVE
+PLS-00117,EMP-1260,2026-10-06T18:00:00+04:00,MOBILITY,PRE_MOVE,Q1,How clear is what happens next in your journey? (1-5),3,بعض الإجراءات استغرقت وقتاً أطول من المتوقع.,ar,ACTIVE
+PLS-00118,EMP-1264,2026-09-07T11:40:00+04:00,MOBILITY,APPROVALS,Q2,How supported do you feel right now? (1-5),4,Clear communication from HR.,en,ACTIVE
+PLS-00119,EMP-1264,2026-09-19T17:40:00+04:00,MOBILITY,PRE_MOVE,Q2,How supported do you feel right now? (1-5),4,"Everything has been smooth so far, thank you.",en,ACTIVE
+PLS-00120,EMP-1264,2026-10-04T12:10:00+04:00,MOBILITY,IN_NEW_ROLE,Q2,How supported do you feel right now? (1-5),4,"Everything has been smooth so far, thank you.",en,ACTIVE
+PLS-00121,EMP-1266,2026-10-07T17:00:00+04:00,MOBILITY,APPROVALS,Q1,How clear is what happens next in your journey? (1-5),1,I don't know who to ask about my pending items.,en,ACTIVE
+PLS-00122,EMP-1267,2026-09-01T18:50:00+04:00,MOBILITY,APPROVALS,Q1,How clear is what happens next in your journey? (1-5),5,My buddy has been really helpful.,en,ACTIVE
+PLS-00123,EMP-1267,2026-09-13T17:45:00+04:00,MOBILITY,PRE_MOVE,Q2,How supported do you feel right now? (1-5),4,Clear communication from HR.,en,ACTIVE
+PLS-00124,EMP-1267,2026-09-28T16:30:00+04:00,MOBILITY,IN_NEW_ROLE,Q1,How clear is what happens next in your journey? (1-5),4,Induction was well organised.,en,ACTIVE
+PLS-00125,EMP-1269,2026-10-11T09:15:00+04:00,MOBILITY,APPROVALS,Q1,How clear is what happens next in your journey? (1-5),5,Clear communication from HR.,en,ACTIVE
+PLS-00126,EMP-1270,2026-10-01T11:40:00+04:00,MOBILITY,PRE_MOVE,Q1,How clear is what happens next in your journey? (1-5),4,Clear communication from HR.,en,ACTIVE
+PLS-00127,EMP-1271,2026-09-10T11:20:00+04:00,MOBILITY,PRE_MOVE,Q1,How clear is what happens next in your journey? (1-5),3,It would help to have one place to see what is pending.,en,ACTIVE
+PLS-00128,EMP-1271,2026-09-25T12:20:00+04:00,MOBILITY,IN_NEW_ROLE,Q2,How supported do you feel right now? (1-5),4,,en,ACTIVE
+PLS-00129,EMP-1272,2026-09-26T16:45:00+04:00,MOBILITY,PRE_MOVE,Q2,How supported do you feel right now? (1-5),4,Clear communication from HR.,en,ACTIVE
+PLS-00130,EMP-1272,2026-10-11T14:40:00+04:00,MOBILITY,IN_NEW_ROLE,Q1,How clear is what happens next in your journey? (1-5),4,Clear communication from HR.,en,ACTIVE
+PLS-00131,EMP-1275,2026-10-10T15:40:00+04:00,MOBILITY,APPROVALS,Q1,How clear is what happens next in your journey? (1-5),5,Induction was well organised.,en,ACTIVE
+PLS-00132,EMP-1276,2026-09-10T18:00:00+04:00,MOBILITY,PRE_MOVE,Q2,How supported do you feel right now? (1-5),5,,ar,ACTIVE
+PLS-00133,EMP-1276,2026-09-25T17:40:00+04:00,MOBILITY,IN_NEW_ROLE,Q2,How supported do you feel right now? (1-5),3,الأمور جيدة بشكل عام لكن لا أعرف دائماً بمن أتصل.,ar,ACTIVE
+PLS-00134,EMP-1277,2026-09-01T14:20:00+04:00,MOBILITY,APPROVALS,Q2,How supported do you feel right now? (1-5),5,"Everything has been smooth so far, thank you.",en,ACTIVE
+PLS-00135,EMP-1277,2026-09-13T15:30:00+04:00,MOBILITY,PRE_MOVE,Q1,How clear is what happens next in your journey? (1-5),3,,en,ACTIVE
+PLS-00136,EMP-1278,2026-10-05T17:00:00+04:00,MOBILITY,APPROVALS,Q1,How clear is what happens next in your journey? (1-5),4,My buddy has been really helpful.,en,ACTIVE
+PLS-00137,EMP-1279,2026-09-08T14:45:00+04:00,MOBILITY,APPROVALS,Q1,How clear is what happens next in your journey? (1-5),4,My buddy has been really helpful.,en,ACTIVE
+PLS-00138,EMP-1279,2026-09-20T18:40:00+04:00,MOBILITY,PRE_MOVE,Q1,How clear is what happens next in your journey? (1-5),4,Clear communication from HR.,en,ACTIVE
+PLS-00139,EMP-1279,2026-10-05T09:45:00+04:00,MOBILITY,IN_NEW_ROLE,Q1,How clear is what happens next in your journey? (1-5),3,A few things took longer than expected.,en,ACTIVE
+PLS-00140,EMP-1280,2026-10-12T19:15:00+04:00,MOBILITY,APPROVALS,Q2,How supported do you feel right now? (1-5),4,,en,ACTIVE
+PLS-00141,EMP-1285,2026-09-04T19:40:00+04:00,MOBILITY,APPROVALS,Q2,How supported do you feel right now? (1-5),4,,ar,ACTIVE
+PLS-00142,EMP-1285,2026-09-16T10:10:00+04:00,MOBILITY,PRE_MOVE,Q1,How clear is what happens next in your journey? (1-5),4,,ar,ACTIVE
+PLS-00143,EMP-1285,2026-10-01T17:50:00+04:00,MOBILITY,IN_NEW_ROLE,Q2,How supported do you feel right now? (1-5),4,كل شيء يسير بسلاسة حتى الآن، شكراً.,ar,ACTIVE
+PLS-00144,EMP-1287,2026-09-16T19:20:00+04:00,MOBILITY,APPROVALS,Q1,How clear is what happens next in your journey? (1-5),5,My buddy has been really helpful.,en,ACTIVE
+PLS-00145,EMP-1287,2026-09-28T09:30:00+04:00,MOBILITY,PRE_MOVE,Q1,How clear is what happens next in your journey? (1-5),4,My buddy has been really helpful.,en,ACTIVE
+PLS-00146,EMP-1287,2026-10-13T18:10:00+04:00,MOBILITY,IN_NEW_ROLE,Q2,How supported do you feel right now? (1-5),3,"Mostly fine, but I am not always sure who to contact.",en,ACTIVE
+PLS-00147,EMP-1288,2026-09-25T10:40:00+04:00,MOBILITY,APPROVALS,Q2,How supported do you feel right now? (1-5),3,بعض الإجراءات استغرقت وقتاً أطول من المتوقع.,ar,ACTIVE
+PLS-00148,EMP-1288,2026-10-07T15:50:00+04:00,MOBILITY,PRE_MOVE,Q2,How supported do you feel right now? (1-5),4,التعريف بالشركة كان منظماً جداً.,ar,ACTIVE
+PLS-00149,EMP-1291,2026-09-29T19:30:00+04:00,MOBILITY,APPROVALS,Q2,How supported do you feel right now? (1-5),5,My buddy has been really helpful.,en,ACTIVE
+PLS-00150,EMP-1291,2026-10-11T16:20:00+04:00,MOBILITY,PRE_MOVE,Q2,How supported do you feel right now? (1-5),4,"Everything has been smooth so far, thank you.",en,ACTIVE
+PLS-00151,EMP-1292,2026-08-31T14:10:00+04:00,MOBILITY,APPROVALS,Q2,How supported do you feel right now? (1-5),3,"Mostly fine, but I am not always sure who to contact.",en,ACTIVE
+PLS-00152,EMP-1292,2026-09-27T10:20:00+04:00,MOBILITY,IN_NEW_ROLE,Q2,How supported do you feel right now? (1-5),4,"Everything has been smooth so far, thank you.",en,ACTIVE
+PLS-00153,EMP-1295,2026-09-29T10:45:00+04:00,MOBILITY,APPROVALS,Q1,How clear is what happens next in your journey? (1-5),5,,en,ACTIVE
+PLS-00154,EMP-1295,2026-10-11T15:45:00+04:00,MOBILITY,PRE_MOVE,Q1,How clear is what happens next in your journey? (1-5),5,,en,ACTIVE
+PLS-00155,EMP-1297,2026-10-12T13:10:00+04:00,MOBILITY,PRE_MOVE,Q1,How clear is what happens next in your journey? (1-5),3,It would help to have one place to see what is pending.,en,ACTIVE
+PLS-00156,EMP-1300,2026-09-04T11:20:00+04:00,MOBILITY,APPROVALS,Q2,How supported do you feel right now? (1-5),3,,en,ACTIVE
+PLS-00157,EMP-1300,2026-09-16T12:50:00+04:00,MOBILITY,PRE_MOVE,Q2,How supported do you feel right now? (1-5),4,Clear communication from HR.,en,ACTIVE
+PLS-00158,EMP-1300,2026-10-01T16:15:00+04:00,MOBILITY,IN_NEW_ROLE,Q2,How supported do you feel right now? (1-5),5,"Everything has been smooth so far, thank you.",en,ACTIVE

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="description" content="Rafiq — employee journey companion prototype (synthetic data).">
+<title>Rafiq — Employee Journey Companion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><b>Rafiq</b><span data-i18n="tagline">Employee journey companion</span></div>
+  <nav class="roles" aria-label="View as">
+    <button data-role="employee" aria-pressed="true" data-i18n="role_employee">Employee</button>
+    <button data-role="manager" aria-pressed="false" data-i18n="role_manager">Manager</button>
+    <button data-role="hrbp" aria-pressed="false" data-i18n="role_hrbp">HR partner</button>
+    <button data-role="owner" aria-pressed="false" data-i18n="role_owner">Service owner</button>
+    <button data-role="insights" aria-pressed="false" data-i18n="role_insights">Insights</button>
+  </nav>
+  <div class="spacer"></div>
+  <label class="small" for="persona" style="color:#a9bad0" data-i18n="viewing_as">Viewing as</label>
+  <select id="persona"></select>
+  <button class="lang" id="langBtn" aria-label="Switch language">العربية</button>
+</header>
+<div class="banner" id="banner"></div>
+<section id="guide" class="guide hidden" aria-labelledby="guideTitle"></section>
+<main id="view" tabindex="-1"><p class="empty">Loading Rafiq… (first load after a quiet period can take up to a minute)</p></main>
+
+<dialog id="dlg"><div id="dlgInner"></div></dialog>
+<div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+<script src="/static/app.js"></script>
+</body>
+</html>
