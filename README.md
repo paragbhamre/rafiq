@@ -10,6 +10,8 @@ Rafiq (رفيق, "companion") gives every new or moving employee one place to as
 
 ## Hosted demo
 
+**Live:** https://rafiq-journey-companion.onrender.com — open it and use **Start here** for the guided paths.
+
 Deployed on Render from this repository using `render.yaml` (Docker, Frankfurt region, health check `/api/health`). The build runs the full test suite, so a broken commit never replaces the live version. Every push to `main` redeploys automatically.
 
 - On the **free** plan the app sleeps after 15 minutes idle, and the first visit then takes about 50 seconds. Switch the plan to **Starter** during judging to keep it awake.
