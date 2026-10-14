@@ -4,10 +4,13 @@ import tempfile
 
 os.environ["RAFIQ_RUNTIME_DIR"] = tempfile.mkdtemp(prefix="rafiq-test-")
 os.environ["LLM_PROVIDER"] = "offline"
+os.environ["RAFIQ_DEMO_PASSWORD"] = "test-demo-pass"
+os.environ["RAFIQ_ADMIN_PASSWORD"] = "test-admin-pass"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
+from app import auth  # noqa: E402
 from app.main import app  # noqa: E402
 
 client = TestClient(app)
@@ -15,7 +18,10 @@ client.__enter__()  # run startup (seeds early warnings)
 
 
 def H(role, user):
-    return {"X-Rafiq-Role": role, "X-Rafiq-User": user}
+    """Headers carrying a real server-signed session for that person (no role headers are trusted)."""
+    acct = auth.directory.find(user)
+    assert acct and acct["role"] == role, (role, user)
+    return {"Cookie": f"{auth.COOKIE}={auth.issue(acct)}", "X-Rafiq-Request": "1"}
 
 
 def ask(emp, msg, lang="en"):
@@ -265,3 +271,80 @@ def test_llm_truncated_reply_is_never_shown(monkeypatch):
     monkeypatch.setattr(llm, "_anthropic", cut)
     out = companion.chat("EMP-1011", "Will my manager see what I tell you?")
     assert out["mode"] == "offline_fallback" and out["reply"].rstrip().endswith((".", "**", ")"))
+
+
+
+# ---------------------------------------------------------------- sign-in and session security
+def _fresh():
+    return TestClient(app, headers={"X-Rafiq-Request": "1"})
+
+
+def test_every_person_has_their_own_account():
+    d = auth.directory
+    for e in auth.pack.employees:
+        assert d.find(e)["role"] == "employee"
+    for m in auth.pack.managers:
+        assert d.find(m)["role"] == "manager"
+    for h in auth.pack.hrbps:
+        assert d.find(h)["role"] == "hrbp"
+    assert len({a["username"] for a in d.users.values()}) == len(d.users)  # usernames unique
+    assert d.find("aisha.rahman")["id"] == "EMP-1001"
+
+
+def test_login_sets_httponly_session_and_me_works():
+    c = _fresh()
+    r = c.post("/api/login", json={"username": "aisha.rahman", "password": "test-demo-pass"})
+    assert r.status_code == 200 and r.json()["home"] == "journey"
+    assert "httponly" in r.headers["set-cookie"].lower() and "samesite=lax" in r.headers["set-cookie"].lower()
+    assert c.get("/api/me").json()["user"]["id"] == "EMP-1001"
+    assert c.get("/api/employee/EMP-1001/journey").status_code == 200
+    assert c.get("/api/employee/EMP-1002/journey").status_code == 403  # someone else's journey
+    c.post("/api/logout")
+    assert c.get("/api/me").status_code == 401
+
+
+def test_wrong_password_and_lockout():
+    c = _fresh()
+    for _ in range(8):
+        assert c.post("/api/login", json={"username": "hr.nadia.farouk", "password": "nope"}).status_code == 401
+    assert c.post("/api/login", json={"username": "hr.nadia.farouk", "password": "test-demo-pass"}).status_code == 429
+
+
+def test_role_headers_are_ignored_without_a_session():
+    c = TestClient(app)
+    spoof = {"X-Rafiq-Role": "hrbp", "X-Rafiq-User": "HRBP-01", "X-Rafiq-Request": "1"}
+    assert c.get("/api/cases", headers=spoof).status_code == 401
+    assert c.get("/api/employee/EMP-1001/mydata", headers=spoof).status_code == 401
+
+
+def test_forged_or_tampered_session_rejected():
+    acct = auth.directory.find("EMP-1001")
+    tok = auth.issue(acct)
+    body, sig = tok.split(".")
+    import base64, json as _j
+    payload = _j.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
+    payload.update(r="hrbp", i="HRBP-01", u="hr.nadia.farouk")
+    forged = base64.urlsafe_b64encode(_j.dumps(payload).encode()).rstrip(b"=").decode() + "." + sig
+    c = TestClient(app)
+    assert c.get("/api/cases", headers={"Cookie": f"{auth.COOKIE}={forged}"}).status_code == 401
+
+
+def test_writes_need_request_header():
+    acct = auth.directory.find("EMP-1001")
+    c = TestClient(app)
+    r = c.post("/api/employee/EMP-1001/chat", json={"message": "hi"}, headers={"Cookie": f"{auth.COOKIE}={auth.issue(acct)}"})
+    assert r.status_code == 403
+
+
+def test_reset_and_credentials_are_admin_only():
+    assert client.post("/api/admin/reset", headers=H("hrbp", "HRBP-01")).status_code == 403
+    a = _fresh()
+    assert a.post("/api/login", json={"username": "admin", "password": "test-admin-pass"}).status_code == 200
+    assert a.post("/api/admin/reset").status_code == 200
+    assert "username,id,role,name,password" in a.get("/api/admin/credentials").text
+
+
+def test_sign_in_page_never_lists_passwords():
+    d = client.get("/api/demo-accounts").json()
+    assert "test-demo-pass" not in str(d) and len(d["employees"]) == 14
+    assert d["counts"]["employee"] == 200

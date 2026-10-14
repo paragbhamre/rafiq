@@ -209,3 +209,28 @@ th { color: var(--ink-3); font-weight: 500; }
   .chat { height: auto; min-height: 480px; }
   .ribbon .ends { display: none; }
 }
+
+/* Sign-in ----------------------------------------------------------- */
+.who { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.2; }
+[dir="rtl"] .who { align-items: flex-start; }
+.who-name { font-weight: 600; font-size: .92rem; }
+.who-role { color: #a9bad0; font-size: .78rem; }
+.login { display: grid; grid-template-columns: minmax(300px, 420px) 1fr; gap: 22px; align-items: start; }
+@media (max-width: 900px) { .login { grid-template-columns: 1fr; } }
+.login-card { padding: 22px; position: sticky; top: 16px; }
+@media (max-width: 900px) { .login-card { position: static; } }
+.login-card h1 { font-size: 1.45rem; font-weight: 700; letter-spacing: -.01em; margin-bottom: 6px; }
+.login-card form { display: flex; flex-direction: column; gap: 6px; margin-top: 16px; }
+.login-card label { font-size: .86rem; font-weight: 500; margin-top: 6px; }
+.login-card input { border: 1px solid var(--line); border-radius: var(--radius-s); padding: 9px 12px; background: #fff; }
+.login-card .btn.primary { margin-top: 10px; padding: 10px 14px; }
+.login-err { color: var(--red); background: var(--red-bg); border-radius: var(--radius-s); padding: 8px 10px; font-size: .88rem; }
+.login-dir h2 { margin-bottom: 4px; }
+.acct-group { margin-top: 16px; }
+.acct-group h3 { margin-bottom: 8px; }
+.acct-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px; }
+.acct { text-align: start; background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius-s); padding: 10px 12px; cursor: pointer; display: flex; flex-direction: column; gap: 2px; }
+.acct:hover { border-color: var(--teal); }
+.acct span { color: var(--ink-3); font-size: .82rem; }
+.acct code { color: var(--teal-ink); font-size: .8rem; font-family: var(--font); }
+@media (max-width: 640px) { .who { display: none; } }

@@ -62,9 +62,10 @@ const SCEN = {
 /* ------------------------------------------------------------------ helpers */
 const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-function headers() { return { "Content-Type": "application/json", "X-Rafiq-Role": S.role === "insights" ? "hrbp" : S.role, "X-Rafiq-User": S.user || "" }; }
+function headers() { return { "Content-Type": "application/json", "X-Rafiq-Request": "1" }; }
 async function api(path, opts = {}) {
-  const r = await fetch(path, { headers: headers(), ...opts });
+  const r = await fetch(path, { credentials: "same-origin", headers: headers(), ...opts });
+  if (r.status === 401 && !path.startsWith("/api/login")) { S.me = null; showLogin(); throw new Error("Please sign in."); }
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.detail || `Request failed (${r.status})`); }
   return r.json();
 }
@@ -82,7 +83,8 @@ function md(text) {
     return `<p class="${isPol ? "pol" : ""}">${h.replace(/\n/g, "<br>")}</p>`;
   }).join("");
 }
-function setLang(lang) {
+function setLang(lang, user = false) {
+  if (user) S.langChosen = true;
   S.lang = lang; document.documentElement.lang = lang; document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
   $("#langBtn").textContent = lang === "ar" ? "English" : "العربية";
   document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); });
@@ -90,75 +92,111 @@ function setLang(lang) {
 
 /* ------------------------------------------------------------------ boot */
 async function boot() {
-  const [health, personas] = await Promise.all([fetch("/api/health").then((r) => r.json()), fetch("/api/personas").then((r) => r.json())]);
-  S.health = health; S.personas = personas;
+  S.health = await fetch("/api/health").then((r) => r.json());
   const params = new URLSearchParams(location.search);
   setLang(params.get("lang") === "ar" ? "ar" : "en");
-  document.querySelectorAll(".roles button").forEach((b) => b.addEventListener("click", () => switchRole(b.dataset.role)));
-  $("#langBtn").addEventListener("click", () => { setLang(S.lang === "en" ? "ar" : "en"); renderBanner(); renderGuide(); render(); });
-  $("#persona").addEventListener("change", (e) => { S.user = e.target.value; S.selectedCase = null; render(); });
+  $("#langBtn").addEventListener("click", () => { setLang(S.lang === "en" ? "ar" : "en", true); renderBanner(); S.me ? (renderChrome(), render()) : showLogin(); });
+  $("#logoutBtn").addEventListener("click", async () => { await api("/api/logout", { method: "POST" }).catch(() => {}); S.me = null; showLogin(); });
   document.addEventListener("click", (e) => { const c = e.target.closest(".cite"); if (c) showCite(c.dataset.cite); });
-  switchRole(params.get("role") || "employee", params.get("user"));
-  renderGuide();
+  renderBanner();
+  const me = await fetch("/api/me", { credentials: "same-origin" });
+  if (me.ok) { signedIn(await me.json()); } else { showLogin(); }
 }
 function renderBanner() {
   const l = S.health.llm; const ar = S.lang === "ar";
   const llm = l.provider === "offline" ? (ar ? "وضع حتمي بدون اتصال" : "offline deterministic mode") : `${l.provider} ${l.model}${l.configured ? "" : " (no key, using offline)"}`;
-  $("#banner").innerHTML = `<span>${t("banner", { asof: S.health.as_of, llm: esc(llm) })}</span><span class="spacer"></span>
-    <button class="linkbtn" id="guideBtn">${ar ? "دليل الاستكشاف" : "Start here"}</button>
-    <button class="linkbtn" id="resetBtn">${ar ? "إعادة ضبط العرض" : "Reset demo"}</button>`;
-  $("#guideBtn").onclick = () => { store("guideHidden", ""); renderGuide(); window.scrollTo({ top: 0, behavior: "smooth" }); };
-  $("#resetBtn").onclick = async () => {
-    if (!confirm(ar ? "مسح الطلبات والحالات والموافقات التي أُنشئت أثناء العرض؟" : "Clear the requests, cases and consent changes made during this demo?")) return;
-    await fetch("/api/admin/reset", { method: "POST" }); toast(ar ? "تمت إعادة ضبط العرض." : "Demo reset to its starting state."); render();
-  };
+  $("#banner").innerHTML = `<span>${t("banner", { asof: S.health.as_of, llm: esc(llm) })}</span>`;
 }
-function store(k, v) { try { if (v === undefined) return localStorage.getItem(k); localStorage.setItem(k, v); } catch { return null; } return null; }
-const TOUR = [
-  ["employee", "EMP-1001", "en", "Aisha, Day 5 with no laptop", "عائشة: اليوم الخامس بدون حاسوب", "Stalled step, ageing ticket, loan device, named escalation"],
-  ["employee", "EMP-1002", "en", "Rafael, visa stalled, flies next week", "رافائيل: تأخر التأشيرة قبل السفر", "Blocking stall within 14 days of joining"],
-  ["employee", "EMP-1013", "en", "Arjun, Singapore tomorrow, no permit", "أرجون: الانتقال إلى سنغافورة غداً", "Internal move that is not ready to go"],
-  ["employee", "EMP-1007", "ar", "Shamma, in Arabic", "شمّا: باللغة العربية", "Housing allowance for her grade, answered in Arabic"],
-  ["employee", "EMP-1006", "en", "Andrei, consent withdrawn", "أندريه: سحب الموافقة", "Open My data: feedback unused and due for deletion"],
-  ["hrbp", "HRBP-01", "en", "HR partner inbox", "صندوق شريك الموارد البشرية", "Early warnings and handoffs, no sentiment"],
-  ["manager", null, "en", "Manager view", "عرض المدير", "Step progress only, never feelings"],
-  ["insights", "HRBP-01", "en", "Where journeys stall", "أين تتعثر الرحلات", "Heatmap with small groups hidden"],
-];
-function renderGuide() {
-  const g = $("#guide"); const ar = S.lang === "ar";
-  if (store("guideHidden") === "1") { g.classList.add("hidden"); return; }
-  g.classList.remove("hidden");
-  g.innerHTML = `<div class="guide-in"><div class="guide-h"><div><h2 id="guideTitle">${ar ? "ابدأ من هنا" : "Start here"}</h2>
-    <p class="small muted">${ar ? "رفيق يعمل لصالح الموظف. اختر شخصية لترى رحلتها، ثم جرّب الأسئلة المقترحة أو اكتب سؤالك." : "Rafiq works for the employee. Pick a person to step into their journey, then try the suggested questions or type your own. All people and data are synthetic."}</p></div>
-    <button class="btn" id="hideGuide">${ar ? "إخفاء" : "Hide"}</button></div>
-    <div class="tour">${TOUR.map((x, i) => `<button class="tour-item" data-i="${i}"><strong>${esc(ar ? x[4] : x[3])}</strong><span>${esc(x[5])}</span></button>`).join("")}</div></div>`;
-  $("#hideGuide").onclick = () => { store("guideHidden", "1"); g.classList.add("hidden"); };
-  g.querySelectorAll(".tour-item").forEach((b) => b.onclick = () => {
-    const x = TOUR[+b.dataset.i]; if (x[2] !== S.lang) { setLang(x[2]); }
-    switchRole(x[0], x[1]); renderGuide(); $("#view").focus();
-  });
+const ROLE_LABEL = { employee: ["Employee", "موظف"], manager: ["Manager", "مدير"], hrbp: ["HR partner", "شريك الموارد البشرية"], owner: ["Service owner", "مالك الخدمة"], admin: ["Admin", "المسؤول"] };
+const NAV = {
+  employee: [["journey", "My journey", "رحلتي"]],
+  manager: [["team", "My team", "فريقي"]],
+  hrbp: [["cases", "Cases", "الحالات"], ["insights", "Insights", "المؤشرات"]],
+  owner: [["cases", "My cases", "حالاتي"], ["insights", "Insights", "المؤشرات"]],
+  admin: [["admin", "Demo admin", "إدارة العرض"], ["insights", "Insights", "المؤشرات"]],
+};
+function signedIn(d) {
+  S.me = d.user; S.page = d.home; S.user = d.user.id; S.role = d.user.role; S.selectedCase = null;
+  if (S.role === "employee" && d.user.lang === "ar" && !S.langChosen) setLang("ar");
+  renderChrome(); render();
 }
-function switchRole(role, user) {
-  S.role = role; S.selectedCase = null;
-  document.querySelectorAll(".roles button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.role === role)));
-  const sel = $("#persona"); sel.innerHTML = ""; const P = S.personas;
-  let opts = [];
-  if (role === "employee") opts = P.employees.map((e) => [e.id, `${e.name} · ${SCEN[e.id] ? SCEN[e.id][0] : `${e.journey === "ONBOARDING" ? "Onboarding" : "Move"}, ${e.stage}`}`]);
-  if (role === "manager") opts = P.managers.map((m) => [m.id, `${m.name} (${m.team} people)`]);
-  if (role === "hrbp" || role === "insights") opts = P.hrbps.map((h) => [h.id, h.name]);
-  if (role === "owner") opts = P.owners.map((o) => [o.id, `${o.name}, ${o.role}`]);
-  for (const [v, l] of opts) { const o = document.createElement("option"); o.value = v; o.textContent = l; sel.appendChild(o); }
-  S.user = user && opts.some((o) => o[0] === user) ? user : opts[0]?.[0];
-  sel.value = S.user;
-  renderBanner(); render();
+function renderChrome() {
+  const ar = S.lang === "ar"; const u = S.me;
+  const nav = $("#nav"); nav.classList.remove("hidden");
+  nav.innerHTML = NAV[u.role].map(([k, en, a]) => `<button data-page="${k}" aria-pressed="${S.page === k}">${ar ? a : en}</button>`).join("");
+  nav.querySelectorAll("button").forEach((b) => b.onclick = () => { S.page = b.dataset.page; S.selectedCase = null; renderChrome(); render(); });
+  $("#who").classList.remove("hidden");
+  $("#who").innerHTML = `<span class="who-name">${esc(u.name)}</span><span class="who-role">${(ROLE_LABEL[u.role] || [u.role])[ar ? 1 : 0]}${u.title ? ` · ${esc(u.title)}` : ""}</span>`;
+  $("#logoutBtn").classList.remove("hidden"); $("#logoutBtn").textContent = ar ? "تسجيل الخروج" : "Sign out";
 }
 function render() {
   const v = $("#view"); v.innerHTML = '<p class="empty">…</p>';
-  ({ employee: renderEmployee, manager: renderManager, hrbp: renderInbox, owner: renderInbox, insights: renderInsights })[S.role]()
-    .catch((e) => { v.innerHTML = `<p class="empty">${esc(e.message)}</p>`; });
+  const fn = { journey: renderEmployee, team: renderManager, cases: renderInbox, insights: renderInsights, admin: renderAdmin }[S.page];
+  fn().catch((e) => { if (S.me) v.innerHTML = `<p class="empty">${esc(e.message)}</p>`; });
 }
 
-/* ------------------------------------------------------------------ employee */
+/* ------------------------------------------------------------------ sign-in */
+async function showLogin() {
+  const ar = S.lang === "ar"; const L = (en, a) => (ar ? a : en);
+  $("#nav").classList.add("hidden"); $("#who").classList.add("hidden"); $("#logoutBtn").classList.add("hidden");
+  $("#dlg").open && $("#dlg").close();
+  let d = S.demo; if (!d) { try { d = S.demo = await fetch("/api/demo-accounts").then((r) => r.json()); } catch { d = null; } }
+  const group = (title, items, note) => items.length ? `<section class="acct-group"><h3>${title}</h3>${note ? `<p class="small muted">${note}</p>` : ""}
+    <div class="acct-list">${items.map((a) => `<button class="acct" data-u="${esc(a.username)}"><strong>${esc(a.name)}</strong><span>${esc(a.tag || "")}</span><code>${esc(a.username)}</code></button>`).join("")}</div></section>` : "";
+  const pwNote = d && d.password_mode === "per_user" ? L("Each account has its own password, listed in the credentials sheet you were given.", "لكل حساب كلمة مرور خاصة مذكورة في ورقة بيانات الدخول.")
+    : L("Use the demo password you were given with the submission.", "استخدم كلمة مرور العرض المرفقة مع المشاركة.");
+  $("#view").innerHTML = `
+  <div class="login">
+    <section class="login-card panel" aria-labelledby="signinTitle">
+      <h1 id="signinTitle">${L("Sign in to Rafiq", "تسجيل الدخول إلى رفيق")}</h1>
+      <p class="muted">${L("Each person has their own account. What you see depends on who you are: employees see only their own journey, managers only their team's step progress, HR partners and service owners only the cases they own.", "لكل شخص حسابه الخاص. يرى الموظف رحلته فقط، والمدير تقدم خطوات فريقه فقط، وشريك الموارد البشرية ومالك الخدمة الحالات المسندة إليهما فقط.")}</p>
+      <form id="loginForm" autocomplete="on">
+        <label for="lu">${L("Username or ID", "اسم المستخدم أو الرقم الوظيفي")}</label>
+        <input id="lu" name="username" autocomplete="username" required placeholder="aisha.rahman  ·  EMP-1001">
+        <label for="lp">${L("Password", "كلمة المرور")}</label>
+        <input id="lp" name="password" type="password" autocomplete="current-password" required>
+        <p class="small muted">${pwNote}</p>
+        <p class="login-err hidden" id="lerr" role="alert"></p>
+        <button class="btn primary" type="submit">${L("Sign in", "تسجيل الدخول")}</button>
+      </form>
+      <p class="small muted" style="margin-top:14px">${L("Prototype with synthetic people and data only. In a pilot, sign-in uses your organisation's single sign-on.", "نموذج أولي بأشخاص وبيانات افتراضية فقط. في المرحلة التجريبية يتم الدخول عبر الدخول الموحد للمؤسسة.")}</p>
+    </section>
+    <section class="login-dir" aria-label="${L("Demo accounts", "حسابات العرض")}">
+      <h2>${L("Demo accounts", "حسابات العرض")}</h2>
+      <p class="small muted">${L(`Pick an account to fill in its username. ${d ? `${d.counts.employee} employees, ${d.counts.manager} managers, ${d.counts.hrbp} HR partners and ${d.counts.owner} service owners each have an account; the people below are set up for the test scenarios.` : ""}`, "اختر حساباً لتعبئة اسم المستخدم.")}</p>
+      ${d ? group(L("Employees", "الموظفون"), d.employees) + group(L("Managers", "المديرون"), d.managers)
+        + group(L("HR partners", "شركاء الموارد البشرية"), d.hrbps.filter((h) => h.featured)) + group(L("Service owners", "مالكو الخدمات"), d.owners, L("Named people who receive escalations.", "الأشخاص المسؤولون عن استلام التصعيد.")) : ""}
+    </section>
+  </div>`;
+  document.querySelectorAll(".acct").forEach((b) => b.onclick = () => { $("#lu").value = b.dataset.u; $("#lp").focus(); window.scrollTo({ top: 0, behavior: "smooth" }); });
+  $("#loginForm").onsubmit = async (ev) => {
+    ev.preventDefault(); const err = $("#lerr"); err.classList.add("hidden");
+    const btn = ev.target.querySelector("button[type=submit]"); btn.disabled = true;
+    try {
+      const r = await fetch("/api/login", { method: "POST", credentials: "same-origin", headers: headers(), body: JSON.stringify({ username: $("#lu").value, password: $("#lp").value }) });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j.detail || L("Sign-in failed.", "تعذر تسجيل الدخول."));
+      signedIn(j);
+    } catch (e) { err.textContent = e.message; err.classList.remove("hidden"); btn.disabled = false; $("#lp").select(); }
+  };
+  $("#lu").focus();
+}
+
+/* ------------------------------------------------------------------ admin */
+async function renderAdmin() {
+  const ar = S.lang === "ar"; const L = (en, a) => (ar ? a : en);
+  const d = S.demo || (S.demo = await fetch("/api/demo-accounts").then((r) => r.json()));
+  $("#view").innerHTML = `<section class="panel"><div class="panel-h"><h2>${L("Demo administration", "إدارة العرض")}</h2></div><div class="panel-b">
+    <p>${L(`Accounts: ${d.counts.employee} employees, ${d.counts.manager} managers, ${d.counts.hrbp} HR partners, ${d.counts.owner} service owners. Password mode: ${d.password_mode}.`, "الحسابات وأسلوب كلمات المرور.")}</p>
+    <div class="acts"><button class="btn primary" id="resetBtn">${L("Reset demo to its starting state", "إعادة ضبط العرض")}</button>
+    ${d.password_mode === "per_user" ? `<a class="btn" href="/api/admin/credentials">${L("Download credentials sheet", "تنزيل ورقة بيانات الدخول")}</a>` : ""}</div>
+    <p class="small muted" style="margin-top:10px">${L("Reset clears requests, cases, consent changes and conversations created during the demo. Everyone using the link sees the same demo data.", "تمسح إعادة الضبط الطلبات والحالات وتغييرات الموافقة والمحادثات التي أُنشئت أثناء العرض.")}</p></div></section>`;
+  $("#resetBtn").onclick = async () => {
+    if (!confirm(L("Clear everything created during this demo?", "مسح كل ما أُنشئ أثناء العرض؟"))) return;
+    await api("/api/admin/reset", { method: "POST" }); toast(L("Demo reset to its starting state.", "تمت إعادة ضبط العرض."));
+  };
+}
+
 async function renderEmployee() {
   const id = S.user;
   const [j, brief, notes] = await Promise.all([api(`/api/employee/${id}/journey`), api(`/api/employee/${id}/brief?lang=${S.lang}`), api(`/api/employee/${id}/notifications`)]);

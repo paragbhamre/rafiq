@@ -13,21 +13,14 @@
 <body>
 <header class="top">
   <div class="brand"><b>Rafiq</b><span data-i18n="tagline">Employee journey companion</span></div>
-  <nav class="roles" aria-label="View as">
-    <button data-role="employee" aria-pressed="true" data-i18n="role_employee">Employee</button>
-    <button data-role="manager" aria-pressed="false" data-i18n="role_manager">Manager</button>
-    <button data-role="hrbp" aria-pressed="false" data-i18n="role_hrbp">HR partner</button>
-    <button data-role="owner" aria-pressed="false" data-i18n="role_owner">Service owner</button>
-    <button data-role="insights" aria-pressed="false" data-i18n="role_insights">Insights</button>
-  </nav>
+  <nav class="roles hidden" id="nav" aria-label="Sections"></nav>
   <div class="spacer"></div>
-  <label class="small" for="persona" style="color:#a9bad0" data-i18n="viewing_as">Viewing as</label>
-  <select id="persona"></select>
+  <div class="who hidden" id="who"></div>
   <button class="lang" id="langBtn" aria-label="Switch language">العربية</button>
+  <button class="lang hidden" id="logoutBtn">Sign out</button>
 </header>
 <div class="banner" id="banner"></div>
-<section id="guide" class="guide hidden" aria-labelledby="guideTitle"></section>
-<main id="view" tabindex="-1"><p class="empty">Loading Rafiq… (first load after a quiet period can take up to a minute)</p></main>
+<main id="view" tabindex="-1"><p class="empty">Loading Rafiq… (the first visit after a quiet period can take up to a minute)</p></main>
 
 <dialog id="dlg"><div id="dlgInner"></div></dialog>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>

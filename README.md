@@ -10,13 +10,17 @@ Rafiq (رفيق, "companion") gives every new or moving employee one place to as
 
 ## Hosted demo
 
-**Live:** https://rafiq-journey-companion.onrender.com — open it and use **Start here** for the guided paths.
+**Live:** https://rafiq-journey-companion.onrender.com
 
-Deployed on Render from this repository using `render.yaml` (Docker, Frankfurt region, health check `/api/health`). The build runs the full test suite, so a broken commit never replaces the live version. Every push to `main` redeploys automatically.
+**Sign-in.** Every person has their own account: 200 employees, 30 managers, 6 HR partners and 7 service owners, plus a demo admin. The sign-in page lists the accounts set up for the test scenarios. Usernames look like `aisha.rahman`, `mgr.hassan.brown`, `hr.nadia.farouk` and `owner.priya.raman`; IDs such as `EMP-1001` also work. Passwords are set in Render (`RAFIQ_DEMO_PASSWORD`, `RAFIQ_ADMIN_PASSWORD`) and are never in this repository. Set `RAFIQ_PASSWORD_MODE=per_user` to give every account a distinct password; the admin can then download the credentials sheet.
 
-- On the **free** plan the app sleeps after 15 minutes idle, and the first visit then takes about 50 seconds. Switch the plan to **Starter** during judging to keep it awake.
-- Demo state (requests, cases, consent changes) is shared by everyone using the link and resets on each deploy. Use **Reset demo** in the banner to return to the starting state.
-- To enable the AI writer, set `LLM_PROVIDER=anthropic` and `ANTHROPIC_API_KEY` in Render, under Environment.
+Identity comes only from a signed, HttpOnly, SameSite session cookie issued by the server (8-hour expiry). Writes require a same-origin request header, and repeated failed sign-ins lock out for 15 minutes. In a pilot, sign-in is replaced by single sign-on (Microsoft Entra ID / OIDC) with the same role rules.
+
+Deployed on Render from this repository using `render.yaml` (Docker, Frankfurt region, health check `/api/health`). The build runs the full test suite, so a broken commit never replaces the live version, and every push to `main` redeploys automatically.
+
+- On the **free** plan the app sleeps after 15 minutes idle, and the first visit then takes about 50 seconds. Switch to **Starter** during judging.
+- Demo data (requests, cases, consent changes) is shared by all accounts. Sign in as `admin` to reset it.
+- The AI writer uses `LLM_PROVIDER=anthropic` with `ANTHROPIC_API_KEY` set in Render. Without a key it falls back to offline mode automatically.
 
 ## Run it
 
@@ -32,12 +36,12 @@ docker run -p 8000:8000 -e LLM_PROVIDER=anthropic -e ANTHROPIC_API_KEY=<key> raf
 ```bash
 pip install -r requirements.txt
 uvicorn app.main:app --port 8000
-python -m pytest -q          # 26 scenario, privacy and guardrail tests
+python -m pytest -q          # 35 scenario, privacy, guardrail and sign-in security tests
 ```
 
-Open http://localhost:8000. Use the top bar to switch between **Employee, Manager, HR partner, Service owner, Insights**, and to switch language (English / العربية). Deep links work too, for example `/?role=employee&user=EMP-1001&lang=ar`.
+Open http://localhost:8000 and sign in. Locally the demo password is `rafiq-demo`; set `RAFIQ_ADMIN_PASSWORD` to enable the `admin` account. Add `?lang=ar` for Arabic.
 
-To reset the demo state (raised requests, cases, consent changes), send `POST /api/admin/reset`.
+To reset the demo state, sign in as `admin` and use **Reset demo**.
 
 ---
 
@@ -99,7 +103,7 @@ Fourteen seeded scenarios and their expected outcomes are listed in `data/scenar
 
 | Area | Prototype | Pilot |
 |---|---|---|
-| Identity | Demo role headers | Microsoft Entra ID SSO; roles from HR system groups |
+| Identity | Per-person accounts, signed session cookies | Microsoft Entra ID SSO; roles from HR system groups |
 | Data | CSV pack | Read-only feeds from HRIS, ITSM and LMS; events streamed nightly or near-real-time |
 | Agents | Simulated | Adapters to ServiceNow, SuccessFactors or Workday, and the PRO and Payroll queues |
 | LLM | Offline or any provider | An approved in-country or enterprise endpoint with no training or retention |

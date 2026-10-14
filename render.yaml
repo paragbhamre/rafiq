@@ -18,3 +18,12 @@ services:
         sync: false       # entered by you in the Render dashboard, never committed
       - key: RAFIQ_MIN_GROUP_SIZE
         value: "10"
+      # Sign-in: one account per person. Passwords are set in the Render dashboard, never committed.
+      - key: RAFIQ_PASSWORD_MODE
+        value: shared      # "per_user" gives every account its own password (admin downloads the sheet)
+      - key: RAFIQ_DEMO_PASSWORD
+        sync: false
+      - key: RAFIQ_ADMIN_PASSWORD
+        sync: false
+      - key: RAFIQ_SESSION_SECRET
+        generateValue: true

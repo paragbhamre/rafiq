@@ -1,18 +1,19 @@
 """Rafiq — Employee Journey Companion. FastAPI application.
 
-Demo identity: the front end sends X-Rafiq-Role (employee | manager | hrbp | owner) and X-Rafiq-User.
-In a pilot this is replaced by SSO (e.g. Microsoft Entra ID) claims; the access rules stay the same.
+Identity: every person signs in with their own account (app/auth.py). The server issues a signed,
+HttpOnly session cookie and derives role and identity from it alone. In a pilot, sign-in is replaced
+by SSO (e.g. Microsoft Entra ID / OIDC) claims; the access rules below stay the same.
 """
 import datetime as dt
 from collections import defaultdict
 from contextlib import asynccontextmanager
 
-from fastapi import Depends, FastAPI, Header, HTTPException
-from fastapi.responses import FileResponse
+from fastapi import Depends, FastAPI, HTTPException, Request, Response
+from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import agents, companion, config, llm
+from . import agents, auth, companion, config, llm
 from .data import _lock, consent_active, pack, set_consent, state
 from .journey import evaluate, manager_view, operational_signals, seed_early_warnings
 
@@ -37,15 +38,10 @@ async def _headers(request, call_next):
 
 
 # --------------------------------------------------------------------------
-# Access control
+# Access control (identity from the signed session only)
 # --------------------------------------------------------------------------
-class Who(BaseModel):
-    role: str
-    user: str
-
-
-def who(x_rafiq_role: str = Header("employee"), x_rafiq_user: str = Header("")) -> Who:
-    return Who(role=x_rafiq_role.lower(), user=x_rafiq_user)
+def _actor(u):
+    return f"{u['role']}:{u['id']}"
 
 
 def _emp_or_404(emp_id):
@@ -54,17 +50,25 @@ def _emp_or_404(emp_id):
     return pack.employees[emp_id]
 
 
-def require_self(emp_id: str, w: Who = Depends(who)):
+def require_self(emp_id: str, u: dict = Depends(auth.current_user)):
     """Only the employee themself can use the companion or see their own data."""
     _emp_or_404(emp_id)
-    if not (w.role == "employee" and w.user == emp_id):
-        state.audit(f"{w.role}:{w.user}", "access_denied", emp_id, "Attempted access to employee-only data")
+    if not (u["role"] == "employee" and u["id"] == emp_id):
+        state.audit(_actor(u), "access_denied", emp_id, "Attempted access to employee-only data")
         raise HTTPException(403, "The companion works for the employee. Only they can see their own conversations and data.")
-    return w
+    return u
+
+
+def require_role(*roles):
+    def dep(u: dict = Depends(auth.current_user)):
+        if u["role"] not in roles:
+            raise HTTPException(403, "Your account can't open this page.")
+        return u
+    return dep
 
 
 # --------------------------------------------------------------------------
-# Meta
+# Meta and sign-in
 # --------------------------------------------------------------------------
 @app.get("/api/health")
 def health():
@@ -72,26 +76,46 @@ def health():
             "employees": len(pack.employees), "synthetic_data": True}
 
 
-@app.get("/api/personas")
-def personas():
-    """Demo persona picker (synthetic people only)."""
-    emps = []
-    for e in pack.employees.values():
-        ev = evaluate(e["employee_id"])
-        emps.append({"id": e["employee_id"], "name": f"{e['first_name']} {e['last_name']}",
-                     "journey": e["journey_type"], "stage": ev["stage_label"], "day": ev["journey_day"],
-                     "role_title": e["role_title"], "location": e["location"], "lang": e["preferred_language"],
-                     "overall": ev["overall"], "seeded": e["employee_id"] < "EMP-1100"})
-    emps.sort(key=lambda x: (not x["seeded"], x["id"]))
-    team_size = defaultdict(int)
-    for e in pack.employees.values():
-        team_size[e["manager_id"]] += 1
-    managers = sorted(({"id": k, "name": v, "team": team_size[k]} for k, v in pack.managers.items()),
-                      key=lambda m: -m["team"])
-    hrbps = [{"id": k, "name": v} for k, v in sorted(pack.hrbps.items())]
-    owners = [{"id": name, "name": name, "role": role} for role, (name, _c) in config.ESCALATION_CONTACTS.items()
-              if role != "Recruiter"]
-    return {"employees": emps, "managers": managers, "hrbps": hrbps, "owners": owners}
+class LoginIn(BaseModel):
+    username: str
+    password: str
+
+
+@app.get("/api/demo-accounts")
+def demo_accounts():
+    """Featured synthetic accounts for the sign-in page. Usernames only, never passwords."""
+    return auth.demo_accounts()
+
+
+@app.post("/api/login")
+def login(body: LoginIn, request: Request, response: Response):
+    if request.headers.get("x-rafiq-request") != "1":
+        raise HTTPException(403, "Missing request header.")
+    ip = request.headers.get("x-forwarded-for", request.client.host if request.client else "?").split(",")[0].strip()
+    key = auth.throttle(ip, body.username)
+    acct = auth.directory.find(body.username)
+    if not acct or not auth.check_password(acct, body.password):
+        auth.record_fail(key)
+        raise HTTPException(401, "That username and password don't match.")
+    secure = request.headers.get("x-forwarded-proto", request.url.scheme) == "https"
+    response.set_cookie(auth.COOKIE, auth.issue(acct), httponly=True, secure=secure, samesite="lax",
+                        max_age=int(auth.SESSION_HOURS * 3600), path="/")
+    state.audit(_actor(acct), "signed_in", acct["id"] if acct["role"] == "employee" else "*", "Signed in")
+    return {"user": auth.public(acct), "home": auth.home_for(acct)}
+
+
+@app.post("/api/logout")
+def logout(response: Response, u: dict = Depends(auth.current_user)):
+    response.delete_cookie(auth.COOKIE, path="/")
+    return {"ok": True}
+
+
+@app.get("/api/me")
+def me(u: dict = Depends(auth.current_user)):
+    out = {"user": auth.public(u), "home": auth.home_for(u)}
+    if u["role"] == "manager":
+        out["team_size"] = sum(1 for e in pack.employees.values() if e["manager_id"] == u["id"])
+    return out
 
 
 # --------------------------------------------------------------------------
@@ -121,26 +145,26 @@ def _public_employee(e):
 
 
 @app.get("/api/employee/{emp_id}/journey")
-def journey(emp_id: str, w: Who = Depends(require_self)):
+def journey(emp_id: str, u: dict = Depends(require_self)):
     ev = evaluate(emp_id)
     ev["employee"] = _public_employee(pack.employees[emp_id])
     return ev
 
 
 @app.get("/api/employee/{emp_id}/brief")
-def brief(emp_id: str, lang: str = "en", w: Who = Depends(require_self)):
+def brief(emp_id: str, lang: str = "en", u: dict = Depends(require_self)):
     return companion.brief(emp_id, lang)
 
 
 @app.post("/api/employee/{emp_id}/chat")
-def chat(emp_id: str, body: ChatIn, w: Who = Depends(require_self)):
+def chat(emp_id: str, body: ChatIn, u: dict = Depends(require_self)):
     if not body.message.strip():
         raise HTTPException(400, "Empty message")
     return companion.chat(emp_id, body.message, body.lang)
 
 
 @app.post("/api/employee/{emp_id}/actions")
-def run_action(emp_id: str, body: ActionIn, w: Who = Depends(require_self)):
+def run_action(emp_id: str, body: ActionIn, u: dict = Depends(require_self)):
     """Employee-confirmed actions. Nothing here runs without the employee pressing the button."""
     a = body.action
     ev = evaluate(emp_id)
@@ -169,12 +193,12 @@ def run_action(emp_id: str, body: ActionIn, w: Who = Depends(require_self)):
 
 
 @app.get("/api/employee/{emp_id}/notifications")
-def notifications(emp_id: str, w: Who = Depends(require_self)):
+def notifications(emp_id: str, u: dict = Depends(require_self)):
     return [n for n in state.data["notifications"] if n["employee_id"] == emp_id][-30:][::-1]
 
 
 @app.get("/api/employee/{emp_id}/mydata")
-def mydata(emp_id: str, w: Who = Depends(require_self)):
+def mydata(emp_id: str, u: dict = Depends(require_self)):
     """Everything held about the employee (POL-PRV-001 §4.1)."""
     ev = evaluate(emp_id)
     active = consent_active(emp_id)
@@ -204,13 +228,13 @@ def mydata(emp_id: str, w: Who = Depends(require_self)):
 
 
 @app.post("/api/employee/{emp_id}/consent")
-def consent(emp_id: str, body: ConsentIn, w: Who = Depends(require_self)):
+def consent(emp_id: str, body: ConsentIn, u: dict = Depends(require_self)):
     set_consent(emp_id, body.active, f"employee:{emp_id}")
     return {"ok": True, "pulse_active": consent_active(emp_id)}
 
 
 @app.delete("/api/employee/{emp_id}/conversations")
-def forget(emp_id: str, w: Who = Depends(require_self)):
+def forget(emp_id: str, u: dict = Depends(require_self)):
     with _lock:
         state.data["conversations"].pop(emp_id, None)
         state.save()
@@ -222,8 +246,8 @@ def forget(emp_id: str, w: Who = Depends(require_self)):
 # Manager: step progress for their own team only
 # --------------------------------------------------------------------------
 @app.get("/api/manager/{mgr_id}/team")
-def team(mgr_id: str, w: Who = Depends(who)):
-    if not (w.role == "manager" and w.user == mgr_id):
+def team(mgr_id: str, u: dict = Depends(auth.current_user)):
+    if not (u["role"] == "manager" and u["id"] == mgr_id):
         raise HTTPException(403, "Managers can only see their own team")
     members = [e for e in pack.employees.values() if e["manager_id"] == mgr_id]
     state.audit(f"manager:{mgr_id}", "team_view", "*", f"Viewed step progress for {len(members)} people")
@@ -239,28 +263,28 @@ class CaseIn(BaseModel):
     note: str | None = None
 
 
-def _case_scope(w: Who):
-    if w.role == "hrbp":
-        return [c for c in state.data["cases"] if c["hrbp"]["id"] == w.user]
-    if w.role == "owner":
-        return [c for c in state.data["cases"] if c["owner"]["name"] == w.user]
+def _case_scope(u):
+    if u["role"] == "hrbp":
+        return [c for c in state.data["cases"] if c["hrbp"]["id"] == u["id"]]
+    if u["role"] == "owner":
+        return [c for c in state.data["cases"] if c["owner"]["name"] == u["id"]]
     raise HTTPException(403, "Only HR Business Partners and named owners can see cases")
 
 
 @app.get("/api/cases")
-def cases(w: Who = Depends(who)):
-    items = _case_scope(w)
+def cases(u: dict = Depends(auth.current_user)):
+    items = _case_scope(u)
     order = {"OPEN": 0, "ACKNOWLEDGED": 1, "RESOLVED": 2}
     return sorted(items, key=lambda c: (order.get(c["status"], 3), c["type"] != "EMPLOYEE_HANDOFF", c["created_at"]), reverse=False)
 
 
 @app.post("/api/cases/{case_id}")
-def update_case(case_id: str, body: CaseIn, w: Who = Depends(who)):
-    if case_id not in {c["case_id"] for c in _case_scope(w)}:
+def update_case(case_id: str, body: CaseIn, u: dict = Depends(auth.current_user)):
+    if case_id not in {c["case_id"] for c in _case_scope(u)}:
         raise HTTPException(404, "Case not found in your scope")
     if body.status and body.status not in ("OPEN", "ACKNOWLEDGED", "RESOLVED"):
         raise HTTPException(400, "Bad status")
-    return agents.update_case(case_id, body.status, body.note, actor=f"{w.role}:{w.user}")
+    return agents.update_case(case_id, body.status, body.note, actor=_actor(u))
 
 
 # --------------------------------------------------------------------------
@@ -271,8 +295,8 @@ def _site_group(loc):
 
 
 @app.get("/api/insights/stalls")
-def stalls(group: str = "location", w: Who = Depends(who)):
-    if w.role not in ("hrbp", "owner"):
+def stalls(group: str = "location", u: dict = Depends(auth.current_user)):
+    if u["role"] not in ("hrbp", "owner", "admin"):
         raise HTTPException(403, "Insights are for HR and service owners")
     key = (lambda e: _site_group(e["location"])) if group == "location" else (lambda e: e["department"])
     cells = defaultdict(lambda: {"applicable": 0, "open_issue": 0, "late_done": 0, "late_days": 0})
@@ -322,13 +346,13 @@ def stalls(group: str = "location", w: Who = Depends(who)):
 # Policy library (not personal data)
 # --------------------------------------------------------------------------
 @app.get("/api/policies")
-def policies():
+def policies(u: dict = Depends(auth.current_user)):
     from .policies import library
     return list(library.policies.values())
 
 
 @app.get("/api/policies/{policy_id}")
-def policy(policy_id: str):
+def policy(policy_id: str, u: dict = Depends(auth.current_user)):
     from .policies import library
     meta = library.policies.get(policy_id)
     if not meta:
@@ -341,10 +365,18 @@ def policy(policy_id: str):
 # Admin (demo only)
 # --------------------------------------------------------------------------
 @app.post("/api/admin/reset")
-def reset():
+def reset(u: dict = Depends(require_role("admin"))):
     state.reset()
     seed_early_warnings()
+    state.audit(_actor(u), "demo_reset", "*", "Demo state reset")
     return {"ok": True}
+
+
+@app.get("/api/admin/credentials", response_class=PlainTextResponse)
+def credentials(u: dict = Depends(require_role("admin"))):
+    """Credentials sheet for judges (per-user password mode). Admin only; never stored in the repo."""
+    state.audit(_actor(u), "credentials_exported", "*", "Exported demo credentials")
+    return PlainTextResponse(auth.credentials_csv(), headers={"Content-Disposition": "attachment; filename=rafiq-demo-accounts.csv"})
 
 
 app.mount("/static", StaticFiles(directory=str(config.ROOT / "static")), name="static")
