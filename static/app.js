@@ -83,6 +83,7 @@ function setLang(lang, user = false) {
 async function boot() {
   S.health = await fetch("/api/health").then((r) => r.json());
   const params = new URLSearchParams(location.search);
+  S.homeStyle = params.get("home") === "full" ? "full" : "window";  // Home shows a five-step window of the route
   setLang(params.get("lang") === "ar" ? "ar" : "en");
   $("#langBtn").addEventListener("click", () => { setLang(S.lang === "en" ? "ar" : "en", true); renderBanner(); if (S.chatEl) { S.chatEl.remove(); S.chatEl = null; } S.me ? (renderChrome(), render()) : showLogin(); });
   $("#logoutBtn").addEventListener("click", async () => { await api("/api/logout", { method: "POST" }).catch(() => {}); S.me = null; S.chatEl = null; showLogin(); });
@@ -241,6 +242,16 @@ async function renderAdmin() {
 }
 
 /* ------------------------------------------------------------------ employee */
+// Steps are numbered in the order they're due (target day), the same everywhere in the app
+async function loadJourney(id) {
+  const j = await api(`/api/employee/${id}/journey`);
+  j.ordered = j.steps.map((s, i) => ({ s, i })).sort((a, b) => a.s.target_day - b.s.target_day || a.i - b.i).map((x, k) => ({ ...x.s, n: k + 1 }));
+  j.no = Object.fromEntries(j.ordered.map((s) => [s.code, s.n]));
+  j.current = j.ordered.find((s) => !["DONE", "DONE_LATE"].includes(s.status)) || null;
+  j.steps = j.ordered;
+  S.journey = j;
+  return j;
+}
 const isOpenReq = (q) => !["RESOLVED", "CLOSED"].includes(q.status);
 const ATTN = ["STALLED", "AT_RISK", "DUE_TODAY"];
 function whereLine(j) {
@@ -255,7 +266,7 @@ function routeCard(j, eyebrow = "") {
     <div class="route-head">
       <div>${eyebrow ? `<p class="eyebrow">${eyebrow}</p>` : ""}<h1>${esc(e.first_name)} ${esc(e.last_name)}</h1><p class="where">${whereLine(j)}</p></div>
       <div style="text-align:end"><span class="state-pill st-${j.overall}">${t("overall")[j.overall]}</span>
-        <p class="small muted" style="margin-top:4px">${j.journey_type === "ONBOARDING" ? t("onboarding") : t("mobility")} · ${esc(ar ? j.stage_label_ar : j.stage_label)} · ${j.progress.done}/${j.progress.total}</p></div>
+        <p class="small muted" style="margin-top:4px">${j.journey_type === "ONBOARDING" ? t("onboarding") : t("mobility")} · ${esc(ar ? j.stage_label_ar : j.stage_label)} · ${j.current ? (ar ? `الخطوة ${j.current.n} من ${j.ordered.length}` : `Step ${j.current.n} of ${j.ordered.length}`) : `${j.progress.done}/${j.progress.total}`}</p></div>
     </div>
     ${ribbon(j)}
   </section>`;
@@ -276,9 +287,50 @@ function notesList(notes, n = 6) {
   return notes.length ? `<ul class="list">${notes.slice(0, n).map((x) => `<li class="small"><span class="muted">${fmtDate(x.at)}</span> · ${esc(ar ? x.text_ar : x.text)}</li>`).join("")}</ul>` : `<p class="muted small">${t("none_updates")}</p>`;
 }
 
+function timeKpi(j) {
+  const ar = S.lang === "ar"; const L = (en, a) => (ar ? a : en);
+  const days = (iso) => Math.round((new Date(iso.slice(0, 10) + "T12:00:00") - new Date(S.health.as_of + "T12:00:00")) / 864e5);
+  if (j.journey_type === "MOBILITY" && j.move_effective_date) {
+    const d = days(j.move_effective_date);
+    return d > 0 ? kpi(L("Days to your move", "أيام حتى انتقالك"), d, L(`Effective ${fmtDate(j.move_effective_date)}`, `يسري في ${fmtDate(j.move_effective_date)}`))
+      : kpi(L("Days in your new role", "أيام في دورك الجديد"), -d, L(`Since ${fmtDate(j.move_effective_date)}`, `منذ ${fmtDate(j.move_effective_date)}`));
+  }
+  const d = j.journey_day; const joined = j.employee.journey_anchor_date;
+  return d < 0 ? kpi(L("Days to joining", "أيام حتى التحاقك"), -d, L(`Joining ${fmtDate(joined)}`, `الالتحاق في ${fmtDate(joined)}`))
+    : kpi(L("Days since joining", "أيام منذ التحاقك"), d, L(`Joined ${fmtDate(joined)}`, `التحقت في ${fmtDate(joined)}`));
+}
+function homeRoute(j) {
+  const ar = S.lang === "ar"; const L = (en, a) => (ar ? a : en);
+  const e = j.employee; const total = j.ordered.length; const done = j.progress.done; const cur = j.current;
+  return `<section class="route jhead home-route">
+    <div class="route-head">
+      <div><p class="eyebrow">${L("Welcome back", "أهلاً بعودتك")}</p><h1>${esc(e.first_name)} ${esc(e.last_name)}</h1><p class="where">${whereLine(j)}</p></div>
+      <div style="text-align:end"><span class="state-pill st-${j.overall}">${t("overall")[j.overall]}</span>
+        <p class="small muted" style="margin-top:4px">${j.journey_type === "ONBOARDING" ? t("onboarding") : t("mobility")} · ${esc(ar ? j.stage_label_ar : j.stage_label)}</p></div>
+    </div>
+    <div class="jprog">
+      <div class="jprog-big">${cur ? L(`Step <b>${cur.n}</b> of ${total}`, `الخطوة <b>${cur.n}</b> من ${total}`) : L(`All ${total} steps done`, `اكتملت جميع الخطوات`)}</div>
+      <div class="jprog-meter"><span class="meter"><span style="width:${Math.round(done / total * 100)}%"></span></span>
+        <span class="small muted">${L(`${done} done · ${total - done} to go`, `${done} مكتملة · ${total - done} متبقية`)}</span></div>
+    </div>
+    ${S.homeStyle === "window" ? `<div class="win-wrap"><span class="win-cap" id="capL"></span><div class="snake win" id="homeSnake"></div><span class="win-cap" id="capR"></span></div>
+      <p class="win-foot"><button class="linkbtn" data-go="journey">${L("View the full route", "عرض المسار كاملاً")} →</button></p>` : `<div class="snake compact" id="homeSnake"></div>`}
+  </section>`;
+}
+function drawHomeRoute(j) {
+  const ar = S.lang === "ar"; const L = (en, a) => (ar ? a : en);
+  if (S.homeStyle !== "window") return drawSnake(j, { box: "#homeSnake" });
+  const n = j.ordered.length; const k = j.current ? j.current.n - 1 : n - 1;
+  const w = $("#homeSnake").clientWidth; const size = w > 820 ? 5 : w > 560 ? 4 : 3;
+  let a = Math.max(0, k - 1); const b = Math.min(n, a + size); a = Math.max(0, b - size);
+  drawSnake(j, { box: "#homeSnake", steps: j.ordered.slice(a, b), cols: size });
+  $("#capL").innerHTML = a ? `<span class="cap-n">${a}</span>${L("earlier", "سابقة")}` : "";
+  $("#capR").innerHTML = n - b ? `<span class="cap-n">${n - b}</span>${L("more", "أخرى")}` : "";
+}
+
 async function renderEmployeeHome() {
   const id = S.user; const ar = S.lang === "ar"; const L = (en, a) => (ar ? a : en);
-  const [j, notes] = await Promise.all([api(`/api/employee/${id}/journey`), api(`/api/employee/${id}/notifications`)]);
+  const [j, notes] = await Promise.all([loadJourney(id), api(`/api/employee/${id}/notifications`)]);
   S.journey = j;
   const label = (s) => esc(ar ? s.label_ar : s.label);
   const attn = j.steps.filter((s) => ATTN.includes(s.status));
@@ -295,9 +347,9 @@ async function renderEmployeeHome() {
     ["!hr", "team", L("Talk to my HR partner", "التحدث مع شريك الموارد البشرية"), esc(j.employee.hrbp_name || "")],
   ];
   $("#view").innerHTML = `
-  ${routeCard(j, L("Welcome back", "أهلاً بعودتك"))}
+  ${S.homeStyle ? homeRoute(j) : routeCard(j, L("Welcome back", "أهلاً بعودتك"))}
   <div class="kpis">
-    ${kpi(L("Steps done", "الخطوات المكتملة"), `<bdi dir="ltr">${j.progress.done}<small>/${j.progress.total}</small></bdi>`, `<span class="meter"><span style="width:${pct}%"></span></span>`)}
+    ${timeKpi(j)}
     ${kpi(L("Needs attention", "يحتاج متابعة"), attn.length, attn.length ? (stalled ? L(`${stalled} stalled`, `${stalled} متوقفة`) : L("due or late", "مستحقة أو متأخرة")) : L("Nothing late", "لا شيء متأخر"), attn.length ? (stalled ? "red" : "amber") : "green")}
     ${kpi(L("Open requests", "طلبات مفتوحة"), openReq.length, overSla ? L(`${overSla} over service level`, `${overSla} تجاوزت مستوى الخدمة`) : L("All within service level", "كلها ضمن مستوى الخدمة"), overSla ? "red" : "")}
     ${kpi(L("Next milestone", "المحطة التالية"), next[0] ? fmtDate(next[0].target_date) : "—", next[0] ? label(next[0]) : L("All steps complete", "اكتملت كل الخطوات"))}
@@ -305,12 +357,12 @@ async function renderEmployeeHome() {
   <div class="dash-grid">
     <section class="panel"><div class="panel-h"><h2>${L("Needs your attention", "يحتاج انتباهك")}</h2></div><div class="panel-b">
       ${attn.length ? `<ul class="att">${attn.map((s) => `<li><span class="tag ${s.status}">${t("status")[s.status]}${s.days_late ? ` +${s.days_late}d` : ""}</span>
-        <div class="att-t"><strong>${label(s)}</strong><span class="small muted">${t("due")} ${fmtDate(s.target_date)} · ${esc(s.owner_team)}</span></div>
+        <div class="att-t"><strong><span class="sno-in">${L("Step", "الخطوة")} ${s.n}</span>${label(s)}</strong><span class="small muted">${t("due")} ${fmtDate(s.target_date)} · ${esc(s.owner_team)}</span></div>
         <button class="btn" data-ask="${label(s)}">${L("Get help", "اطلب المساعدة")}</button></li>`).join("")}</ul>`
         : `<p class="empty-ok">${L("You're on track. Nothing needs you right now.", "رحلتك تسير وفق الخطة. لا شيء يحتاجك الآن.")}</p>`}
     </div></section>
     <section class="panel"><div class="panel-h"><h2>${L("Coming up", "القادم")}</h2><button class="linkbtn" data-go="journey">${L("All steps", "كل الخطوات")}</button></div><div class="panel-b">
-      ${next.length ? `<ul class="list">${next.slice(0, 4).map((s) => `<li><div class="li-row"><strong>${label(s)}</strong><span class="small muted">${fmtDate(s.target_date)}</span></div><div class="small muted">${esc(s.owner_team)}</div></li>`).join("")}</ul>` : `<p class="muted small">${L("Nothing scheduled.", "لا شيء مجدول.")}</p>`}
+      ${next.length ? `<ul class="list">${next.slice(0, 4).map((s) => `<li><div class="li-row"><strong><span class="sno-in">${L("Step", "الخطوة")} ${s.n}</span>${label(s)}</strong><span class="small muted">${fmtDate(s.target_date)}</span></div><div class="small muted">${esc(s.owner_team)}</div></li>`).join("")}</ul>` : `<p class="muted small">${L("Nothing scheduled.", "لا شيء مجدول.")}</p>`}
     </div></section>
   </div>
   <h2 class="sec-title">${L("What would you like to do?", "ماذا تريد أن تفعل؟")}</h2>
@@ -320,6 +372,8 @@ async function renderEmployeeHome() {
     <section class="panel"><div class="panel-h"><h2>${t("updates")}</h2></div><div class="panel-b">${notesList(notes, 5)}</div></section>
   </div>`;
   bindRibbon();
+  if (S.homeStyle) drawHomeRoute(j);
+  if (!S._homeResize) { S._homeResize = true; window.addEventListener("resize", () => { if (S.page === "home" && S.journey && $("#homeSnake")) drawHomeRoute(S.journey); }); }
   document.querySelectorAll("[data-go]").forEach((b) => b.onclick = () => go(b.dataset.go));
   document.querySelectorAll("[data-ask]").forEach((b) => b.onclick = () => go("chat", { ask: (ar ? "ما وضع " : "What's the status of ") + b.dataset.ask + "?" }));
   document.querySelectorAll("[data-qa]").forEach((b) => b.onclick = () => {
@@ -335,7 +389,7 @@ async function renderChat() {
   if (S.chatEl && S.chatKey === `${id}|${S.lang}`) {
     $("#view").innerHTML = ""; $("#view").appendChild(S.chatEl); refreshSide(); return askPending();
   }
-  const j = S.journey = await api(`/api/employee/${id}/journey`);
+  const j = S.journey = await loadJourney(id);
   const wrap = document.createElement("div"); wrap.className = "chat-page";
   wrap.innerHTML = `
   <div class="chat-col">
@@ -386,12 +440,65 @@ function askPending() { if (S.pendingAsk) { $("#input").value = S.pendingAsk; S.
 
 async function renderJourney() {
   const id = S.user; const ar = S.lang === "ar"; const L = (en, a) => (ar ? a : en);
-  const j = S.journey = await api(`/api/employee/${id}/journey`);
-  $("#view").innerHTML = `${routeCard(j)}
-  <section class="panel"><div class="panel-h"><div><h2>${t("all_steps")}</h2><p class="small muted">${L("Tap a step on the route, or use Get help, to ask Rafiq about it.", "اضغط على خطوة في المسار أو على «اطلب المساعدة» لسؤال رفيق عنها.")}</p></div></div>
-    <div class="panel-b"><ul class="steps steps-wide">${j.steps.map((s) => stepRow(s, true)).join("")}</ul></div></section>`;
-  bindRibbon();
+  const j = await loadJourney(id);
+  const e = j.employee; const total = j.ordered.length; const done = j.progress.done;
+  const cur = j.current;
+  $("#view").innerHTML = `
+  <section class="route jhead">
+    <div class="route-head">
+      <div><h1>${esc(e.first_name)} ${esc(e.last_name)}</h1><p class="where">${whereLine(j)}</p></div>
+      <div style="text-align:end"><span class="state-pill st-${j.overall}">${t("overall")[j.overall]}</span>
+        <p class="small muted" style="margin-top:4px">${j.journey_type === "ONBOARDING" ? t("onboarding") : t("mobility")} · ${esc(ar ? j.stage_label_ar : j.stage_label)}</p></div>
+    </div>
+    <div class="jprog">
+      <div class="jprog-big">${cur ? L(`Step <b>${cur.n}</b> of ${total}`, `الخطوة <b>${cur.n}</b> من ${total}`) : L(`All ${total} steps done`, `اكتملت جميع الخطوات (${total})`)}</div>
+      <div class="jprog-meter"><span class="meter"><span style="width:${Math.round(done / total * 100)}%"></span></span>
+        <span class="small muted">${L(`${done} done · ${total - done} to go`, `${done} مكتملة · ${total - done} متبقية`)}</span></div>
+    </div>
+    <div class="snake" id="snake"></div>
+    <div class="snake-key small muted">
+      <span><i class="kd DONE"></i>${L("Done", "مكتمل")}</span><span><i class="kd STALLED"></i>${L("Late", "متأخر")}</span>
+      <span><i class="kd DUE_TODAY"></i>${L("Due today", "مستحق اليوم")}</span><span><i class="kd UPCOMING"></i>${L("Coming up", "قادم")}</span>
+      <span class="muted">${L("Select a step to ask Rafiq about it.", "اختر خطوة لتسأل رفيق عنها.")}</span>
+    </div>
+  </section>
+  <section class="panel"><div class="panel-h"><div><h2>${t("all_steps")}</h2></div></div>
+    <div class="panel-b"><ul class="steps steps-wide">${j.ordered.map((s) => stepRow(s, true)).join("")}</ul></div></section>`;
+  drawSnake(j);
+  if (!S._snakeResize) { S._snakeResize = true; window.addEventListener("resize", () => { if (S.page === "journey" && S.journey) drawSnake(S.journey); if (S.page === "home" && S.journey && $("#homeSnake")) drawHomeRoute(S.journey); }); }
   document.querySelectorAll("[data-ask]").forEach((b) => b.onclick = () => go("chat", { ask: (ar ? "ما وضع " : "What's the status of ") + b.dataset.ask + "?" }));
+}
+
+function drawSnake(j, opt = {}) {
+  const box = $(opt.box || "#snake"); if (!box) return;
+  const ar = S.lang === "ar"; const L = (en, a) => (ar ? a : en);
+  const w = box.clientWidth;
+  const cols = opt.cols || (w > 1050 ? 5 : w > 760 ? 4 : w > 520 ? 3 : 2);
+  const steps = opt.steps || j.ordered; const isDone = (s) => s && ["DONE", "DONE_LATE"].includes(s.status);
+  const rows = []; for (let i = 0; i < steps.length; i += cols) rows.push(steps.slice(i, i + cols));
+  box.style.setProperty("--cols", cols);
+  box.innerHTML = rows.map((row, r) => {
+    const last = r === rows.length - 1;
+    const nextRowFirst = rows[r + 1]?.[0];
+    const turnDone = isDone(row[row.length - 1]) && isDone(nextRowFirst);
+    return `<div class="snake-row ${r % 2 ? "rev" : ""} ${last ? "" : "turn"} ${turnDone ? "seg-done" : ""}">${row.map((s, k) => {
+      const nxt = row[k + 1];
+      const lbl = esc(ar ? s.label_ar : s.label);
+      const here = j.current && j.current.code === s.code;
+      const sub = isDone(s) ? fmtDate(s.completed_at) : `${t("due")} ${fmtDate(s.target_date)}`;
+      const cls = [s.status, nxt ? "has-next" : "", nxt && isDone(s) && isDone(nxt) ? "seg-done" : "",
+        !nxt && !last ? "to-turn" : "", k === 0 && r > 0 ? "from-turn" : "", k === 0 && r > 0 && isDone(s) && isDone(rows[r - 1].slice(-1)[0]) ? "in-done" : "",
+        here ? "here" : ""].join(" ");
+      return `<button class="sn ${cls}" data-label="${lbl}" title="${lbl}: ${t("status")[s.status]}">
+        ${here ? `<span class="sn-here">${L("You are here", "أنت هنا")}</span>` : ""}
+        <span class="sn-node">${isDone(s) ? "✓" : s.n}</span>
+        <span class="sn-n">${L("Step", "الخطوة")} ${s.n}</span>
+        <span class="sn-l">${lbl}</span>
+        <span class="sn-d">${sub}${["STALLED", "AT_RISK"].includes(s.status) ? ` · <b>${t("status")[s.status]} +${s.days_late}d</b>` : s.status === "DUE_TODAY" ? ` · <b>${t("status").DUE_TODAY}</b>` : ""}</span>
+      </button>`;
+    }).join("")}</div>`;
+  }).join("");
+  box.querySelectorAll(".sn").forEach((b) => b.onclick = () => go("chat", { ask: (ar ? "ما وضع " : "What's the status of ") + b.dataset.label + "?" }));
 }
 
 async function renderProfile() {
@@ -450,7 +557,7 @@ async function renderProfile() {
 
 async function renderRequests() {
   const id = S.user; const ar = S.lang === "ar"; const L = (en, a) => (ar ? a : en);
-  const j = S.journey = await api(`/api/employee/${id}/journey`);
+  const j = S.journey = await loadJourney(id);
   const open = j.requests.filter(isOpenReq); const done = j.requests.filter((q) => !isOpenReq(q));
   $("#view").innerHTML = `${pageHead(L("My requests", "طلباتي"), L("Requests raised for you by Rafiq's service agents or by the teams helping you.", "الطلبات التي رفعها لك وكلاء الخدمة في رفيق أو الفرق التي تساعدك."))}
   <div class="dash-grid">
@@ -502,7 +609,8 @@ function stepRow(s, help = false) {
   const ar = S.lang === "ar";
   const sub = s.completed_at ? fmtDate(s.completed_at) : `${t("due")} ${fmtDate(s.target_date)} · ${esc(s.owner_team)}`;
   const lbl = esc(ar ? s.label_ar : s.label);
-  return `<li class="${s.status}"><span class="dot"></span><div><div class="s-label">${lbl}</div><div class="s-sub">${sub}</div></div><span class="tag ${s.status}">${t("status")[s.status]}${["STALLED", "AT_RISK"].includes(s.status) ? ` +${s.days_late}d` : ""}</span>${help ? (ATTN.includes(s.status) ? `<button class="btn btn-s" data-ask="${lbl}">${ar ? "اطلب المساعدة" : "Get help"}</button>` : "<span></span>") : ""}</li>`;
+  const n = s.n || (S.journey?.no || {})[s.code] || "";
+  return `<li class="${s.status}"><span class="sno">${n}</span><div><div class="s-label">${lbl}</div><div class="s-sub">${sub}</div></div><span class="tag ${s.status}">${t("status")[s.status]}${["STALLED", "AT_RISK"].includes(s.status) ? ` +${s.days_late}d` : ""}</span>${help ? (ATTN.includes(s.status) ? `<button class="btn btn-s" data-ask="${lbl}">${ar ? "اطلب المساعدة" : "Get help"}</button>` : "<span></span>") : ""}</li>`;
 }
 
 function addMe(text) { const d = document.createElement("div"); d.className = "msg me"; d.textContent = text; $("#msgs").appendChild(d); scrollMsgs(); }
@@ -569,7 +677,7 @@ function confirmEscalation(a, btn) {
 }
 async function refreshSide() {
   const id = S.user;
-  const [j, notes] = await Promise.all([api(`/api/employee/${id}/journey`), api(`/api/employee/${id}/notifications`)]);
+  const [j, notes] = await Promise.all([loadJourney(id), api(`/api/employee/${id}/notifications`)]);
   S.journey = j;
   if ($("#sideSteps")) $("#sideSteps").innerHTML = j.steps.map((s) => stepRow(s)).join("");
   if ($("#sideProg")) $("#sideProg").textContent = `${j.progress.done}/${j.progress.total}`;
