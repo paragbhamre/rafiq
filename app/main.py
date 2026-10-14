@@ -144,6 +144,7 @@ def me(u: dict = Depends(auth.current_user)):
 class ChatIn(BaseModel):
     message: str
     lang: str = "en"
+    thread_id: str | None = None
 
 
 class ActionIn(BaseModel):
@@ -190,7 +191,32 @@ def brief(emp_id: str, lang: str = "en", u: dict = Depends(require_self)):
 def chat(emp_id: str, body: ChatIn, u: dict = Depends(require_self)):
     if not body.message.strip():
         raise HTTPException(400, "Empty message")
-    return companion.chat(emp_id, body.message, body.lang)
+    return companion.chat(emp_id, body.message, body.lang, body.thread_id)
+
+
+@app.get("/api/employee/{emp_id}/threads")
+def threads(emp_id: str, u: dict = Depends(require_self)):
+    """The employee's own conversations, newest first. Nobody else can list them."""
+    return [{k: t[k] for k in ("id", "title", "created_at", "last_at", "messages")} for t in state.threads(emp_id)]
+
+
+@app.get("/api/employee/{emp_id}/threads/{thread_id}")
+def thread(emp_id: str, thread_id: str, u: dict = Depends(require_self)):
+    t = state.thread_get(emp_id, thread_id)
+    if not t:
+        raise HTTPException(404, "Conversation not found")
+    return {"id": t["id"], "title": t["title"], "messages": [
+        {"role": m["role"], "text": m["text"], "at": m["at"], **({"meta": m["meta"]} if m.get("meta") else {})}
+        for m in state.thread_messages(emp_id, thread_id)]}
+
+
+@app.delete("/api/employee/{emp_id}/threads/{thread_id}")
+def delete_thread(emp_id: str, thread_id: str, u: dict = Depends(require_self)):
+    if not state.thread_get(emp_id, thread_id):
+        raise HTTPException(404, "Conversation not found")
+    state.thread_delete(emp_id, thread_id)
+    state.audit(f"employee:{emp_id}", "conversation_deleted", emp_id, "Employee deleted one conversation")
+    return {"ok": True}
 
 
 @app.post("/api/employee/{emp_id}/actions")
@@ -252,6 +278,7 @@ def mydata(emp_id: str, u: dict = Depends(require_self)):
                                 "created_at": c["created_at"], "status": c["status"]} for c in cases],
         "manager_can_see": f"Journey step progress only (no conversations, pulse or sentiment). See {cref('POL-PRV-001 §5.1')}.",
         "conversation_messages": state.conv_count(emp_id),
+        "conversations": len(state.threads(emp_id)),
         "retention": f"Conversation history is deleted after 90 days, or now if you choose ({cref('POL-PRV-001 §8.1')}).",
         "access_log": state.audit_for(emp_id, 20),
     }

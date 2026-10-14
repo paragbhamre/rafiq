@@ -669,23 +669,45 @@ def render(draft):
     return "\n\n".join(draft.lines)
 
 
-def chat(emp_id, msg, ui_lang="en"):
+def chat(emp_id, msg, ui_lang="en", thread_id=None):
+    """One turn in a conversation. With no thread_id (or one that isn't this employee's) a new
+    conversation is started; the AI writer only sees the history of the current conversation."""
     msg = (msg or "").strip()[:1500]
+    if thread_id and not state.thread_get(emp_id, thread_id):
+        thread_id = None
     draft, ev = route(emp_id, msg, ui_lang)
     text = render(draft)
     mode = "offline"
     if config.LLM_PROVIDER != "offline" and not draft.refused:
-        written = llm.rewrite(emp_id, msg, draft, ev, history=_history(emp_id))
+        written = llm.rewrite(emp_id, msg, draft, ev, history=_history(emp_id, thread_id) if thread_id else [])
         if written:
             text, mode = written, "ai"
         else:
             mode = "offline_fallback"
     cites = [dict(cite=c, **{k: library.get(c)[k] for k in ("title", "heading", "text")}) for c in draft.cites]
+    new = thread_id is None
+    if new:
+        thread_id = state.thread_create(emp_id, _title(draft, ev, msg))
     out = {"reply": text, "lang": draft.lang, "intent": draft.intent, "citations": cites, "actions": draft.actions,
            "refused": draft.refused, "unsure": draft.unsure, "steps": draft.steps, "mode": mode,
-           "overall": ev["overall"]}
-    _remember(emp_id, msg, text)
+           "overall": ev["overall"], "thread_id": thread_id, "new_thread": new}
+    _remember(emp_id, msg, out)
     return out
+
+
+def _title(draft, ev, msg):
+    """A short name for a new conversation: the journey step it's about, else the topic, else the question."""
+    ar = draft.lang == "ar"
+    if draft.steps:
+        s = next((x for x in ev["steps"] if x["code"] == draft.steps[0]), None)
+        if s:
+            return s["label_ar"] if ar else s["label"]
+    named = {"PRIVACY": ("Privacy and your data", "الخصوصية وبياناتك"), "STATUS": ("Your journey", "رحلتك"),
+             "SUPPORT": ("Getting support", "الحصول على الدعم"), "CONTACTS": ("Your contacts", "جهات الاتصال")}
+    if draft.intent in named:
+        return named[draft.intent][1 if ar else 0]
+    t = re.sub(r"\s+", " ", msg).strip().rstrip("?.!")
+    return (t[:46] + "…") if len(t) > 47 else t
 
 
 def brief(emp_id, ui_lang="en"):
@@ -701,10 +723,11 @@ def brief(emp_id, ui_lang="en"):
             "refused": False, "unsure": False, "steps": draft.steps, "mode": "offline", "overall": ev["overall"]}
 
 
-def _history(emp_id):
-    return state.conv_recent(emp_id, 6)
+def _history(emp_id, thread_id=None):
+    return state.conv_recent(emp_id, 6, thread_id)
 
 
-def _remember(emp_id, msg, reply):
-    state.conv_append(emp_id, "user", msg)
-    state.conv_append(emp_id, "assistant", reply)
+def _remember(emp_id, msg, out):
+    state.conv_append(emp_id, "user", msg, out["thread_id"])
+    meta = {k: out[k] for k in ("lang", "intent", "citations", "actions", "refused", "unsure", "mode")}
+    state.conv_append(emp_id, "assistant", out["reply"], out["thread_id"], meta)

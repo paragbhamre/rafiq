@@ -401,3 +401,34 @@ def test_profile_is_visible_only_to_the_employee():
     assert "pulse_opt_in" not in p
     assert client.get("/api/employee/EMP-1002/profile", headers=H("employee", "EMP-1001")).status_code == 403
     assert client.get("/api/employee/EMP-1001/profile", headers=H("manager", "MGR-204")).status_code == 403
+
+
+def test_conversations_are_threads_private_and_capped():
+    emp, h = "EMP-1009", H("employee", "EMP-1009")
+    client.delete(f"/api/employee/{emp}/conversations", headers=h)
+    r1 = client.post(f"/api/employee/{emp}/chat", json={"message": "What's next for me?"}, headers=h).json()
+    assert r1["new_thread"] and r1["thread_id"]
+    r2 = client.post(f"/api/employee/{emp}/chat", json={"message": "Who can see my data?", "thread_id": r1["thread_id"]}, headers=h).json()
+    assert r2["thread_id"] == r1["thread_id"] and not r2["new_thread"]
+    r3 = client.post(f"/api/employee/{emp}/chat", json={"message": "Is there a housing allowance?"}, headers=h).json()
+    assert r3["thread_id"] != r1["thread_id"]
+    lst = client.get(f"/api/employee/{emp}/threads", headers=h).json()
+    assert [t["id"] for t in lst] == [r3["thread_id"], r1["thread_id"]] and lst[1]["messages"] == 4
+    t = client.get(f"/api/employee/{emp}/threads/{r1['thread_id']}", headers=h).json()
+    assert [m["role"] for m in t["messages"]] == ["user", "assistant", "user", "assistant"]
+    assert t["messages"][1]["meta"]["citations"] is not None
+    # nobody else can list, read, continue or delete them
+    other = H("employee", "EMP-1001")
+    assert client.get(f"/api/employee/{emp}/threads", headers=other).status_code == 403
+    assert client.get(f"/api/employee/EMP-1001/threads/{r1['thread_id']}", headers=other).status_code == 404
+    hijack = client.post("/api/employee/EMP-1001/chat", json={"message": "hi", "thread_id": r1["thread_id"]}, headers=other).json()
+    assert hijack["thread_id"] != r1["thread_id"]
+    assert client.get(f"/api/employee/{emp}/threads", headers=H("hrbp", "HRBP-01")).status_code == 403
+    # delete one, then cap at 10
+    assert client.delete(f"/api/employee/{emp}/threads/{r3['thread_id']}", headers=h).json()["ok"]
+    for i in range(12):
+        client.post(f"/api/employee/{emp}/chat", json={"message": f"What's next for me? ({i})"}, headers=h)
+    lst = client.get(f"/api/employee/{emp}/threads", headers=h).json()
+    assert len(lst) == 10 and r1["thread_id"] not in [x["id"] for x in lst]
+    client.delete(f"/api/employee/{emp}/conversations", headers=h)
+    assert client.get(f"/api/employee/{emp}/threads", headers=h).json() == []

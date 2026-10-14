@@ -398,24 +398,48 @@ async function renderEmployeeHome() {
 async function renderChat() {
   const id = S.user; const ar = S.lang === "ar"; const L = (en, a) => (ar ? a : en);
   if (S.chatEl && S.chatKey === `${id}|${S.lang}`) {
-    $("#view").innerHTML = ""; $("#view").appendChild(S.chatEl); refreshSide(); return askPending();
+    $("#view").innerHTML = ""; $("#view").appendChild(S.chatEl); refreshSide(); loadThreads(); return askPending();
   }
   const j = S.journey = await loadJourney(id);
   const wrap = document.createElement("div"); wrap.className = "chat-page";
   wrap.innerHTML = `
-  <div class="chat-col">
+  <div class="chat-col with-threads">
     ${pageHead(L("Ask Rafiq", "اسأل رفيق"), L("Answers from your policies and your journey, with the source. Rafiq never approves or decides; people do.", "إجابات من سياساتك ورحلتك، مع ذكر المصدر. ورفيق لا يقرر نيابة عن أحد."))}
     <div class="ctx" id="ctx"></div>
+    <div class="chat-shell">
+    <aside class="threads" aria-label="${L("Your conversations", "محادثاتك")}">
+      <button class="btn new-thread" id="newThread">＋ ${L("New conversation", "محادثة جديدة")}</button>
+      <button class="linkbtn t-toggle" id="tToggle" aria-expanded="false">${L("Your conversations", "محادثاتك")} <span id="tCount"></span></button>
+      <div class="t-list" id="tList"></div>
+      <p class="t-note">${L("Only you can see these. Kept for 90 days; the 10 most recent are kept.", "لا يراها غيرك. تُحفظ 90 يوماً، ويُحتفظ بآخر 10 محادثات.")}</p>
+    </aside>
     <section class="panel chat" aria-label="Chat">
       <div class="msgs" id="msgs" aria-live="polite"></div>
       <div class="typing hidden" id="typing"><span></span><span></span><span></span> ${t("thinking")}</div>
       <div class="suggest" id="suggest"></div>
       <form class="composer" id="composer"><textarea id="input" rows="1" placeholder="${t("ask")}" aria-label="${t("ask")}"></textarea><button class="btn primary" type="submit">${t("send")}</button></form>
     </section>
+    </div>
   </div>`;
   $("#view").innerHTML = ""; $("#view").appendChild(wrap);
   S.chatEl = wrap; S.chatKey = `${id}|${S.lang}`;
   renderCtx(j);
+  S.threadId = null;
+  startNew(j);
+  $("#composer").addEventListener("submit", (ev) => { ev.preventDefault(); send(); });
+  $("#input").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); send(); } });
+  $("#input").addEventListener("input", (ev) => { ev.target.style.height = "auto"; ev.target.style.height = Math.min(140, ev.target.scrollHeight) + "px"; });
+  $("#suggest").addEventListener("click", (ev) => { const b = ev.target.closest("button"); if (b) { $("#input").value = b.textContent; send(); } });
+  $("#ctx").addEventListener("click", (ev) => { if (ev.target.closest("[data-go]")) go(ev.target.closest("[data-go]").dataset.go); });
+  $("#newThread").onclick = () => { S.threadId = null; startNew(S.journey); renderThreadList(); $("#input").focus(); closeThreadsMobile(); };
+  $("#tToggle").onclick = () => { const open = $(".threads").classList.toggle("open"); $("#tToggle").setAttribute("aria-expanded", open); };
+  loadThreads();
+  askPending();
+}
+
+function startNew(j) {
+  const ar = S.lang === "ar"; const L = (en, a) => (ar ? a : en);
+  $("#msgs").innerHTML = "";
   // Short greeting from the journey (the full picture is one question away, and on Home)
   const label = (s) => ar ? s.label_ar : s.label;
   const late = j.steps.filter((s) => ["STALLED", "AT_RISK"].includes(s.status));
@@ -432,13 +456,40 @@ async function renderChat() {
   late.slice(0, 2).forEach((s) => { const q = (ar ? "ما وضع " : "What's happening with ") + label(s) + "?"; if (!prompts.some((p) => p.includes(label(s)))) prompts.push(q); });
   prompts.push(...(ar ? ["ما هي خطواتي التالية؟", "من يمكنه رؤية بياناتي؟"] : ["What's next for me?", "Who can see my data?"]));
   $("#suggest").innerHTML = [...new Set(prompts)].slice(0, 5).map((p) => `<button>${esc(p)}</button>`).join("");
-  $("#composer").addEventListener("submit", (ev) => { ev.preventDefault(); send(); });
-  $("#input").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); send(); } });
-  $("#input").addEventListener("input", (ev) => { ev.target.style.height = "auto"; ev.target.style.height = Math.min(140, ev.target.scrollHeight) + "px"; });
-  $("#suggest").addEventListener("click", (ev) => { const b = ev.target.closest("button"); if (b) { $("#input").value = b.textContent; send(); } });
-  $("#ctx").addEventListener("click", (ev) => { if (ev.target.closest("[data-go]")) go(ev.target.closest("[data-go]").dataset.go); });
-  askPending();
+  $("#suggest").classList.remove("hidden");
 }
+
+async function loadThreads() {
+  try { S.threads = await api(`/api/employee/${S.user}/threads`); } catch { S.threads = []; }
+  renderThreadList();
+}
+function renderThreadList() {
+  const ar = S.lang === "ar"; const L = (en, a) => (ar ? a : en);
+  const el = $("#tList"); if (!el) return;
+  $("#tCount").textContent = S.threads?.length ? `(${S.threads.length})` : "";
+  el.innerHTML = (S.threads || []).length ? S.threads.map((t) => `<div class="t-item ${t.id === S.threadId ? "on" : ""}" data-id="${t.id}">
+      <button class="t-open" data-id="${t.id}"><span class="t-title">${esc(t.title === "Earlier conversation" && ar ? "محادثة سابقة" : t.title)}</span><span class="t-date">${fmtDate(t.last_at)}</span></button>
+      <button class="t-del" data-id="${t.id}" title="${L("Delete this conversation", "حذف هذه المحادثة")}" aria-label="${L("Delete this conversation", "حذف هذه المحادثة")}">×</button></div>`).join("")
+    : `<p class="t-empty">${L("Your conversations will appear here.", "ستظهر محادثاتك هنا.")}</p>`;
+  el.querySelectorAll(".t-open").forEach((b) => b.onclick = () => openThread(b.dataset.id));
+  el.querySelectorAll(".t-del").forEach((b) => b.onclick = async () => {
+    if (!b.classList.contains("sure")) { b.classList.add("sure"); b.textContent = L("Delete?", "حذف؟"); setTimeout(() => { b.classList.remove("sure"); b.textContent = "×"; }, 3000); return; }
+    await api(`/api/employee/${S.user}/threads/${b.dataset.id}`, { method: "DELETE" });
+    if (S.threadId === b.dataset.id) { S.threadId = null; startNew(S.journey); }
+    toast(L("Conversation deleted.", "تم حذف المحادثة.")); loadThreads();
+  });
+}
+async function openThread(id) {
+  const t = await api(`/api/employee/${S.user}/threads/${id}`);
+  S.threadId = id; $("#msgs").innerHTML = ""; $("#suggest").classList.add("hidden");
+  for (const m of t.messages) {
+    if (m.role === "user") addMe(m.text);
+    else addBot({ reply: m.text, citations: m.meta?.citations || [], actions: m.meta?.actions || [], lang: m.meta?.lang || S.lang,
+                  intent: m.meta?.intent, mode: m.meta?.mode, restored: true }, false);
+  }
+  scrollMsgs(); renderThreadList(); closeThreadsMobile(); $("#input").focus();
+}
+function closeThreadsMobile() { $(".threads")?.classList.remove("open"); $("#tToggle")?.setAttribute("aria-expanded", "false"); }
 function renderCtx(j) {
   const ar = S.lang === "ar"; const L = (en, a) => (ar ? a : en);
   const late = j.steps.filter((s) => ["STALLED", "AT_RISK"].includes(s.status)).length;
@@ -630,17 +681,31 @@ function addBot(r, scroll = true) {
   const d = document.createElement("div"); d.className = "msg bot";
   const extra = r.citations.filter((c) => !r.reply.includes(c.cite));
   d.innerHTML = `<span class="bot-av" aria-hidden="true">R</span><div class="bot-main"><div class="body" dir="${r.lang === "ar" ? "rtl" : "ltr"}">${md(r.reply)}</div>
-    ${r.actions.length ? `<div class="acts">${r.actions.map((a, i) => `<button class="btn ${a.primary ? "primary" : ""}" data-i="${i}">${esc(a.label)}</button>`).join("")}</div>` : ""}
+    ${r.actions.length ? (r.restored ? restoredActs(r.actions) : `<div class="acts">${r.actions.map((a, i) => `<button class="btn ${a.primary ? "primary" : ""}" data-i="${i}">${esc(a.label)}</button>`).join("")}</div>`) : ""}
     ${extra.length ? `<div class="meta">${t("sources")}: ${extra.map((c) => `<button class="cite" data-cite="${c.cite}">${c.cite}</button>`).join("")}</div>` : ""}
     ${r.mode && r.mode !== "offline" && r.intent !== "BRIEF" ? `<div class="meta">${r.mode === "offline_fallback" ? (S.lang === "ar" ? "إجابة قياسية من الحقائق المؤكدة" : "Standard answer from verified facts") : (S.lang === "ar" ? "صاغها الذكاء الاصطناعي من الحقائق والمصادر المؤكدة فقط" : "Worded by AI from verified facts and the sources shown only")}</div>` : ""}</div>`;
-  d.querySelectorAll(".acts .btn").forEach((b) => b.addEventListener("click", () => doAction(r.actions[+b.dataset.i], b)));
+  if (!r.restored) d.querySelectorAll(".acts .btn").forEach((b) => b.addEventListener("click", () => doAction(r.actions[+b.dataset.i], b)));
   $("#msgs").appendChild(d); if (scroll) scrollMsgs();
 }
+function restoredActs(actions) {
+  // Buttons in an earlier conversation can't be pressed again; done ones are ticked
+  const ar = S.lang === "ar"; const reqs = (S.journey?.requests || []).map((q) => q.subject);
+  return `<div class="acts acts-old">${actions.map((a) => {
+    const done = a.type === "RAISE_REQUEST" && reqs.includes(a.label);
+    return `<span class="act-old ${done ? "done" : ""}">${done ? "✓ " : ""}${esc(a.label)}</span>`;
+  }).join("")}<span class="act-note">${ar ? "من محادثة سابقة. اسأل مجدداً لاتخاذ إجراء." : "From an earlier conversation. Ask again to act on it."}</span></div>`;
+}
+
 async function send() {
   const inp = $("#input"); const text = inp.value.trim(); if (!text) return;
   inp.value = ""; inp.style.height = "auto"; addMe(text); $("#typing").classList.remove("hidden");
   $("#suggest")?.classList.add("hidden");  // suggestions help you start; once you're talking they step aside
-  try { addBot(await api(`/api/employee/${S.user}/chat`, { method: "POST", body: JSON.stringify({ message: text, lang: S.lang }) })); }
+  try {
+    const r = await api(`/api/employee/${S.user}/chat`, { method: "POST", body: JSON.stringify({ message: text, lang: S.lang, thread_id: S.threadId || null }) });
+    addBot(r);
+    if (r.thread_id !== S.threadId) { S.threadId = r.thread_id; }
+    loadThreads();
+  }
   catch (e) { addBot({ reply: e.message, citations: [], actions: [], lang: S.lang }); }
   finally { $("#typing").classList.add("hidden"); }
 }
@@ -736,7 +801,7 @@ async function openMyData() {
   const dlg = $("#dlg"); dlg.className = "wide"; if (!dlg.open) dlg.showModal();
   $("#dlgInner").innerHTML = $("#dlgInner").innerHTML.replace(/\[([A-Z][A-Z0-9]*(?:-[A-Z0-9]+)* §[\d.]+)\]/g, (m, c) => `<button class="cite" data-cite="${c}">${c}</button>`);
   $("#consentBtn").onclick = async () => { await api(`/api/employee/${S.user}/consent`, { method: "POST", body: JSON.stringify({ active: !d.consent.pulse_active }) }); toast(d.consent.pulse_active ? L("Consent withdrawn.", "تم سحب الموافقة.") : L("Thanks — you've opted in.", "شكراً — تمت الموافقة.")); openMyData(); };
-  $("#forgetBtn").onclick = async () => { await api(`/api/employee/${S.user}/conversations`, { method: "DELETE" }); toast(L("Conversation history deleted.", "تم حذف سجل المحادثات.")); openMyData(); };
+  $("#forgetBtn").onclick = async () => { await api(`/api/employee/${S.user}/conversations`, { method: "DELETE" }); toast(L("Conversation history deleted.", "تم حذف سجل المحادثات.")); if (S.chatEl) { S.chatEl.remove(); S.chatEl = null; S.threadId = null; } openMyData(); };
 }
 
 /* ------------------------------------------------------------------ manager home */

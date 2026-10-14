@@ -5,7 +5,8 @@
   consent_events  every consent change (append-only); current consent = latest event
   audit_log       append-only access and action log
   notifications   updates shown to the employee
-  conversations   companion chat history (employee can delete)
+  conversations   companion chat history, grouped into threads (employee can delete)
+  threads         the employee's conversations: title and start time (max 10 kept, 90-day retention)
   priority        priority overrides on pack requests
   flags           one-off markers (e.g. early warnings seeded)
 
@@ -57,7 +58,7 @@ class JsonStore(BaseStore):
 
     def _empty(self):
         return {"requests": [], "cases": [], "consent_events": [], "audit": [], "notifications": [],
-                "conversations": [], "priority": {}, "flags": {}}
+                "conversations": [], "threads": [], "priority": {}, "flags": {}}
 
     def _load(self):
         with _lock:
@@ -157,11 +158,13 @@ class JsonStore(BaseStore):
         return [c for c in self.data["consent_events"] if c["employee_id"] == employee_id]
 
     # conversations
-    def conv_append(self, employee_id, role, text):
-        self._append("conversations", {"at": self.now_iso(), "employee_id": employee_id, "role": role, "text": text})
+    def conv_append(self, employee_id, role, text, thread_id=None, meta=None):
+        self._append("conversations", {"at": self.now_iso(), "employee_id": employee_id, "role": role, "text": text,
+                                       "thread_id": thread_id, "meta": meta})
 
-    def conv_recent(self, employee_id, n=6):
-        return [c for c in self.data["conversations"] if c["employee_id"] == employee_id][-n:]
+    def conv_recent(self, employee_id, n=6, thread_id=None):
+        return [c for c in self.data["conversations"] if c["employee_id"] == employee_id
+                and (thread_id is None or c.get("thread_id") == thread_id)][-n:]
 
     def conv_count(self, employee_id):
         return sum(1 for c in self.data["conversations"] if c["employee_id"] == employee_id)
@@ -169,7 +172,66 @@ class JsonStore(BaseStore):
     def conv_delete(self, employee_id):
         with _lock:
             self.data["conversations"] = [c for c in self.data["conversations"] if c["employee_id"] != employee_id]
+            self.data["threads"] = [t for t in self.data.get("threads", []) if t["employee_id"] != employee_id]
             self._save()
+
+    # threads
+    def thread_create(self, employee_id, title):
+        t = {"id": self.new_id("THR"), "employee_id": employee_id, "title": title[:80], "created_at": self.now_iso()}
+        self._append("threads", t)
+        self._prune_threads(employee_id)
+        return t["id"]
+
+    def threads(self, employee_id):
+        self._adopt_legacy(employee_id)
+        conv = self.data["conversations"]
+        out = []
+        for t in self.data.get("threads", []):
+            if t["employee_id"] != employee_id:
+                continue
+            idx = [i for i, c in enumerate(conv) if c.get("thread_id") == t["id"]]
+            out.append({**t, "messages": len(idx), "last_at": conv[idx[-1]]["at"] if idx else t["created_at"],
+                        "_order": idx[-1] if idx else -1})
+        out.sort(key=lambda x: x["_order"], reverse=True)
+        for o in out:
+            o.pop("_order")
+        return out
+
+    def thread_get(self, employee_id, thread_id):
+        return next((t for t in self.data.get("threads", []) if t["id"] == thread_id and t["employee_id"] == employee_id), None)
+
+    def thread_messages(self, employee_id, thread_id):
+        return [c for c in self.data["conversations"] if c["employee_id"] == employee_id and c.get("thread_id") == thread_id]
+
+    def thread_delete(self, employee_id, thread_id):
+        with _lock:
+            self.data["threads"] = [t for t in self.data.get("threads", []) if not (t["id"] == thread_id and t["employee_id"] == employee_id)]
+            self.data["conversations"] = [c for c in self.data["conversations"]
+                                          if not (c["employee_id"] == employee_id and c.get("thread_id") == thread_id)]
+            self._save()
+
+    def _adopt_legacy(self, employee_id):
+        """Messages saved before threads existed become one 'Earlier conversation'."""
+        legacy = [c for c in self.data["conversations"] if c["employee_id"] == employee_id and not c.get("thread_id")]
+        if legacy:
+            tid = self.thread_create(employee_id, "Earlier conversation")
+            with _lock:
+                for c in legacy:
+                    c["thread_id"] = tid
+                self._save()
+
+    def _prune_threads(self, employee_id):
+        keep = {t["id"] for t in self.threads_raw_order(employee_id)[:THREAD_LIMIT]}
+        cutoff = (config.AS_OF - dt.timedelta(days=RETENTION_DAYS)).isoformat()
+        for t in list(self.data.get("threads", [])):
+            if t["employee_id"] == employee_id and (t["id"] not in keep or t["created_at"][:10] < cutoff):
+                self.thread_delete(employee_id, t["id"])
+
+    def threads_raw_order(self, employee_id):
+        conv = self.data["conversations"]
+        ts = [t for t in self.data.get("threads", []) if t["employee_id"] == employee_id]
+        last = {t["id"]: max([i for i, c in enumerate(conv) if c.get("thread_id") == t["id"]], default=10**9) for t in ts}
+        return sorted(ts, key=lambda t: last[t["id"]], reverse=True)
 
     # flags
     def flag_get(self, key):
@@ -251,6 +313,18 @@ CREATE TABLE IF NOT EXISTS conversations (
   recorded_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS conversations_employee ON conversations (employee_id, id);
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS thread_id TEXT;
+ALTER TABLE conversations ADD COLUMN IF NOT EXISTS meta JSONB;
+CREATE INDEX IF NOT EXISTS conversations_thread ON conversations (thread_id, id);
+
+CREATE TABLE IF NOT EXISTS threads (
+  id           TEXT PRIMARY KEY,
+  employee_id  TEXT NOT NULL,
+  title        TEXT NOT NULL,
+  created_at   TEXT NOT NULL,
+  seq          BIGSERIAL
+);
+CREATE INDEX IF NOT EXISTS threads_employee ON threads (employee_id);
 
 CREATE TABLE IF NOT EXISTS flags (
   key          TEXT PRIMARY KEY,
@@ -258,8 +332,10 @@ CREATE TABLE IF NOT EXISTS flags (
 );
 """
 
-TABLES = ["requests", "request_priority", "cases", "consent_events", "audit_log", "notifications", "conversations", "flags"]
-SEED_LOCK_ID = 7_331_842  # pg advisory lock: only one instance seeds early warnings
+TABLES = ["requests", "request_priority", "cases", "consent_events", "audit_log", "notifications", "conversations", "threads", "flags"]
+SEED_LOCK_ID = 7_331_842
+THREAD_LIMIT = 10        # conversations kept per employee (oldest removed first)
+RETENTION_DAYS = 90      # conversations older than this are removed (POL-PRV-001 §8.1)  # pg advisory lock: only one instance seeds early warnings
 
 
 class PgStore(BaseStore):
@@ -383,13 +459,17 @@ class PgStore(BaseStore):
         return [dict(zip(("at", "employee_id", "status", "by"), r)) for r in rows]
 
     # conversations
-    def conv_append(self, employee_id, role, text):
-        self._x("INSERT INTO conversations (employee_id, role, text, at) VALUES (%s,%s,%s,%s)",
-                (employee_id, role, text, self.now_iso()))
+    def conv_append(self, employee_id, role, text, thread_id=None, meta=None):
+        self._x("INSERT INTO conversations (employee_id, role, text, at, thread_id, meta) VALUES (%s,%s,%s,%s,%s,%s)",
+                (employee_id, role, text, self.now_iso(), thread_id, self.Jsonb(meta) if meta is not None else None))
 
-    def conv_recent(self, employee_id, n=6):
-        rows = self._all("SELECT at, role, text FROM conversations WHERE employee_id=%s ORDER BY id DESC LIMIT %s",
-                         (employee_id, n))
+    def conv_recent(self, employee_id, n=6, thread_id=None):
+        if thread_id is None:
+            rows = self._all("SELECT at, role, text FROM conversations WHERE employee_id=%s ORDER BY id DESC LIMIT %s",
+                             (employee_id, n))
+        else:
+            rows = self._all("SELECT at, role, text FROM conversations WHERE employee_id=%s AND thread_id=%s ORDER BY id DESC LIMIT %s",
+                             (employee_id, thread_id, n))
         return [dict(zip(("at", "role", "text"), r)) for r in reversed(rows)]
 
     def conv_count(self, employee_id):
@@ -397,6 +477,51 @@ class PgStore(BaseStore):
 
     def conv_delete(self, employee_id):
         self._x("DELETE FROM conversations WHERE employee_id=%s", (employee_id,))
+        self._x("DELETE FROM threads WHERE employee_id=%s", (employee_id,))
+
+    # threads
+    def thread_create(self, employee_id, title):
+        tid = self.new_id("THR")
+        self._x("INSERT INTO threads (id, employee_id, title, created_at) VALUES (%s,%s,%s,%s)",
+                (tid, employee_id, title[:80], self.now_iso()))
+        self._prune_threads(employee_id)
+        return tid
+
+    def threads(self, employee_id):
+        self._adopt_legacy(employee_id)
+        rows = self._all("""SELECT t.id, t.title, t.created_at, count(c.id), max(c.at), coalesce(max(c.id), 0) AS last_id, t.seq
+                            FROM threads t LEFT JOIN conversations c ON c.thread_id = t.id
+                            WHERE t.employee_id=%s GROUP BY t.id ORDER BY last_id DESC, t.seq DESC""", (employee_id,))
+        return [{"id": r[0], "employee_id": employee_id, "title": r[1], "created_at": r[2], "messages": r[3],
+                 "last_at": r[4] or r[2]} for r in rows]
+
+    def thread_get(self, employee_id, thread_id):
+        r = self._one("SELECT id, title, created_at FROM threads WHERE id=%s AND employee_id=%s", (thread_id, employee_id))
+        return {"id": r[0], "employee_id": employee_id, "title": r[1], "created_at": r[2]} if r else None
+
+    def thread_messages(self, employee_id, thread_id):
+        rows = self._all("SELECT at, role, text, meta FROM conversations WHERE employee_id=%s AND thread_id=%s ORDER BY id",
+                         (employee_id, thread_id))
+        return [{"at": r[0], "role": r[1], "text": r[2], "meta": r[3], "thread_id": thread_id} for r in rows]
+
+    def thread_delete(self, employee_id, thread_id):
+        self._x("DELETE FROM conversations WHERE employee_id=%s AND thread_id=%s", (employee_id, thread_id))
+        self._x("DELETE FROM threads WHERE employee_id=%s AND id=%s", (employee_id, thread_id))
+
+    def _adopt_legacy(self, employee_id):
+        if self._one("SELECT 1 FROM conversations WHERE employee_id=%s AND thread_id IS NULL LIMIT 1", (employee_id,)):
+            tid = self.new_id("THR")
+            self._x("INSERT INTO threads (id, employee_id, title, created_at) VALUES (%s,%s,%s,%s)",
+                    (tid, employee_id, "Earlier conversation", self.now_iso()))
+            self._x("UPDATE conversations SET thread_id=%s WHERE employee_id=%s AND thread_id IS NULL", (tid, employee_id))
+
+    def _prune_threads(self, employee_id):
+        cutoff = (config.AS_OF - dt.timedelta(days=RETENTION_DAYS)).isoformat()
+        rows = self._all("""SELECT t.id, t.created_at FROM threads t LEFT JOIN conversations c ON c.thread_id = t.id
+                            WHERE t.employee_id=%s GROUP BY t.id ORDER BY coalesce(max(c.id), 9e18) DESC, t.seq DESC""", (employee_id,))
+        for k, (tid, created) in enumerate(rows):
+            if k >= THREAD_LIMIT or created[:10] < cutoff:
+                self.thread_delete(employee_id, tid)
 
     # flags
     def flag_get(self, key):
