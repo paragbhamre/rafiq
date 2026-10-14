@@ -1,0 +1,54 @@
+/* ==========================================================================
+   Rafiq theme tokens
+   --------------------------------------------------------------------------
+   Every colour, font, radius and shadow the interface uses is defined here and
+   nowhere else. To put Rafiq in an organisation's own design system, replace the
+   values below with that organisation's approved tokens; no other file changes.
+
+   Default theme: "Airline premium". It is inspired by an aviation context, but it is
+   not an official brand of any airline: no logos, wordmarks or proprietary typefaces.
+   ========================================================================== */
+:root {
+  /* Brand */
+  --accent: #b3122a;          /* primary actions, focus, active navigation */
+  --accent-ink: #8c0e21;      /* hover and pressed state of the accent */
+  --accent-soft: #f8e9eb;     /* tinted backgrounds for accent elements */
+  --gold: #a6814c;            /* hairlines and quiet detail (journey path, dividers) */
+
+  /* Neutrals */
+  --ink: #1d1d1f;             /* primary text, dark surfaces */
+  --ink-2: #44444a;           /* secondary text */
+  --ink-3: #75757d;           /* tertiary text, captions */
+  --canvas: #f6f6f5;          /* page background */
+  --subtle: #efefed;          /* quiet fills (bot messages, chips) */
+  --subtle-2: #e4e4e1;        /* dividers inside panels */
+  --surface: #ffffff;         /* panels, cards, inputs */
+  --line: #dcdcd8;            /* borders */
+
+  /* Header */
+  --bar-bg: #ffffff;
+  --bar-ink: #1d1d1f;
+  --bar-muted: #75757d;
+  --bar-rule: var(--accent);
+
+  /* Journey status (always paired with a text label, never colour alone) */
+  --on-time: #1f7a4d;   --green-bg: #e7f3ec;
+  --amber: #a86a00;     --amber-bg: #fbf1de;
+  --red: #c4320a;       --red-bg: #fcebe5;   /* stalled: orange-red, distinct from the brand accent */
+
+  /* Shape and depth */
+  --radius-s: 4px;
+  --radius-m: 6px;
+  --shadow: 0 1px 2px rgba(29, 29, 31, .05);
+
+  /* Type */
+  --font: "IBM Plex Sans Arabic", system-ui, sans-serif;
+  --font-display: "Noto Serif Display", "Noto Naskh Arabic", Georgia, serif;
+
+  /* Legacy names used by app.css (kept so a theme swap stays a one-file change) */
+  --sky: var(--canvas);
+  --sky-2: var(--subtle-2);
+  --paper: var(--surface);
+  --teal: var(--accent);
+  --teal-ink: var(--accent-ink);
+}

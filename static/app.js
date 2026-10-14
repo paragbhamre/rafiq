@@ -127,6 +127,7 @@ async function showLogin() {
   <div class="login">
     <section class="login-card panel" aria-labelledby="signinTitle">
       <h1 id="signinTitle">${L("Sign in", "تسجيل الدخول")}</h1>
+      <p class="login-sub">${L("Your onboarding and move, in one place.", "رحلة انضمامك وانتقالك في مكان واحد.")}</p>
       <form id="loginForm" autocomplete="on">
         <label for="lu">${L("Username", "اسم المستخدم")}</label>
         <input id="lu" name="username" autocomplete="username" autocapitalize="none" spellcheck="false" required>

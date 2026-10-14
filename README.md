@@ -95,6 +95,10 @@ static/  (vanilla JS, no build)          app/
 
 Fourteen seeded scenarios and their expected outcomes are listed in `data/scenarios.md`.
 
+## Look and feel
+
+All colours, fonts, radii and shadows live in one file, `static/theme.css`. The default theme is an airline-premium style (white header with a red rule, charcoal text, a deep red accent, gold detail, serif display headings that pair with Arabic). It is not an official brand of any airline: no logos, wordmarks or proprietary typefaces. To adopt an organisation's design system, replace the values in `theme.css` with its approved tokens; nothing else changes.
+
 ## Swapping in the official data pack
 
 1. Drop the official files into `data/` (same file names).

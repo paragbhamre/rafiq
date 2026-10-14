@@ -7,12 +7,14 @@
 <meta name="description" content="Rafiq — employee journey companion prototype (synthetic data).">
 <title>Rafiq — Employee Journey Companion</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=Noto+Naskh+Arabic:wght@500;600&family=Noto+Serif+Display:wght@500;600&display=swap">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="/static/theme.css">
 <link rel="stylesheet" href="/static/app.css">
 </head>
 <body>
 <header class="top">
-  <div class="brand"><b>Rafiq</b><span data-i18n="tagline">Employee journey companion</span></div>
+  <div class="brand"><b>Rafiq</b><span class="brand-ar" lang="ar" aria-hidden="true">رفيق</span><span class="tagline" data-i18n="tagline">Employee journey companion</span></div>
   <nav class="roles hidden" id="nav" aria-label="Sections"></nav>
   <div class="spacer"></div>
   <div class="who hidden" id="who"></div>
@@ -21,6 +23,8 @@
 </header>
 <div class="banner" id="banner"></div>
 <main id="view" tabindex="-1"><p class="empty">Loading Rafiq… (the first visit after a quiet period can take up to a minute)</p></main>
+
+<footer class="foot"><span>Prototype by APEX Partners</span><span>Synthetic data only</span><span>Not an official Emirates system</span></footer>
 
 <dialog id="dlg"><div id="dlgInner"></div></dialog>
 <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
