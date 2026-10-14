@@ -149,6 +149,16 @@ def _public_employee(e):
     return {k: e.get(k, "") for k in keys}
 
 
+@app.get("/api/employee/{emp_id}/profile")
+def profile(emp_id: str, u: dict = Depends(require_self)):
+    """The employee's own record, as held in the HR system (the pack). Only they can open it."""
+    e = pack.employees[emp_id]
+    out = _public_employee(e)
+    out["manager_id"] = e.get("manager_id", "")
+    out["username"] = u.get("username", "")
+    return out
+
+
 @app.get("/api/employee/{emp_id}/journey")
 def journey(emp_id: str, u: dict = Depends(require_self)):
     ev = evaluate(emp_id)

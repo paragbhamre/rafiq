@@ -388,3 +388,11 @@ def test_early_warnings_seeded_once():
     seed_early_warnings()
     seed_early_warnings()
     assert len(state.cases()) == before
+
+
+def test_profile_is_visible_only_to_the_employee():
+    p = client.get("/api/employee/EMP-1001/profile", headers=H("employee", "EMP-1001")).json()
+    assert p["role_title"] and p["manager_name"] == "Hassan Brown" and p["hrbp_name"] == "Nadia Farouk"
+    assert "pulse_opt_in" not in p
+    assert client.get("/api/employee/EMP-1002/profile", headers=H("employee", "EMP-1001")).status_code == 403
+    assert client.get("/api/employee/EMP-1001/profile", headers=H("manager", "MGR-204")).status_code == 403

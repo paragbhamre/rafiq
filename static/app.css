@@ -60,6 +60,13 @@ body.signed-in main { width: 100%; max-width: 1240px; padding: 24px 32px 48px; }
 
 /* Dashboards --------------------------------------------------------- */
 .page-head { margin-bottom: 18px; }
+.profile-hero { display: flex; align-items: center; gap: 18px; padding: 20px 24px; margin-bottom: 18px; border-top: 3px solid var(--gold); }
+.avatar { width: 64px; height: 64px; flex: none; border-radius: 50%; display: grid; place-items: center; background: var(--accent-soft); color: var(--accent-ink); font-family: var(--font-display); font-size: 1.5rem; font-weight: 600; border: 1px solid var(--gold); }
+.profile-name { font-family: var(--font-display); font-size: 1.5rem; }
+.profile-pill { margin-inline-start: auto; align-self: flex-start; }
+.who .who-link { color: var(--bar-ink); font-weight: 600; font-size: inherit; }
+.who .who-link:hover { color: var(--accent-ink); text-decoration: underline; }
+.profile-hero + .dash-grid .kv { gap: 9px 18px; }
 .page-head h1 { font-size: 1.75rem; }
 .page-head p { margin-top: 4px; }
 .eyebrow { font-size: .76rem; letter-spacing: .14em; text-transform: uppercase; color: var(--gold); font-weight: 600; margin-bottom: 4px; }

@@ -100,13 +100,14 @@ const ICON = {
   cases: '<path d="M3.5 7.5h17v12h-17z"/><path d="M9 7.5V5h6v2.5M3.5 12.5h17"/>',
   insights: '<path d="M4 20V11M10 20V5M16 20v-6M2.5 20.5h19"/>',
   admin: '<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>',
+  profile: '<circle cx="12" cy="8.5" r="3.8"/><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"/>',
   arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
 };
 const icon = (k, cls = "ico") => `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true" focusable="false">${ICON[k]}</svg>`;
 // [page, icon, English, Arabic]; pages starting with "!" are actions (open a dialog), not pages
 const NAV = {
   employee: [["home", "home", "Home", "الرئيسية"], ["chat", "chat", "Ask Rafiq", "اسأل رفيق"], ["journey", "route", "My journey", "رحلتي"],
-             ["requests", "requests", "My requests", "طلباتي"], ["policies", "policies", "Policies", "السياسات"], ["!mydata", "privacy", "My data", "بياناتي"]],
+             ["requests", "requests", "My requests", "طلباتي"], ["policies", "policies", "Policies", "السياسات"], ["profile", "profile", "My profile", "ملفي الشخصي"], ["!mydata", "privacy", "My data", "بياناتي"]],
   manager: [["home", "home", "Home", "الرئيسية"], ["team", "team", "My team", "فريقي"], ["policies", "policies", "Policies", "السياسات"]],
   hrbp: [["home", "home", "Home", "الرئيسية"], ["cases", "cases", "Cases", "الحالات"], ["insights", "insights", "Insights", "المؤشرات"], ["policies", "policies", "Policies", "السياسات"]],
   owner: [["home", "home", "Home", "الرئيسية"], ["cases", "cases", "My cases", "حالاتي"], ["insights", "insights", "Insights", "المؤشرات"], ["policies", "policies", "Policies", "السياسات"]],
@@ -137,8 +138,9 @@ function renderChrome() {
     go(b.dataset.page);
   });
   $("#who").classList.remove("hidden");
-  $("#who").innerHTML = `<span class="who-name">${esc(u.name)}</span><span class="who-role">${(ROLE_LABEL[u.role] || [u.role])[ar ? 1 : 0]}${u.title ? ` · ${esc(u.title)}` : ""}</span>`;
+  $("#who").innerHTML = `<span class="who-name">${u.role === "employee" ? `<button class="linkbtn who-link" id="whoLink">${esc(u.name)}</button>` : esc(u.name)}</span><span class="who-role">${(ROLE_LABEL[u.role] || [u.role])[ar ? 1 : 0]}${u.title ? ` · ${esc(u.title)}` : ""}</span>`;
   $("#logoutBtn").classList.remove("hidden"); $("#logoutBtn").textContent = ar ? "تسجيل الخروج" : "Sign out";
+  $("#whoLink")?.addEventListener("click", () => go("profile"));
 }
 function go(page, opts = {}) {
   if (S.page === "chat" && S.chatEl) S.chatEl.remove();
@@ -150,7 +152,7 @@ function render() {
   const v = $("#view"); if (!(S.page === "chat" && S.chatEl)) v.innerHTML = '<p class="empty">…</p>';
   const home = { employee: renderEmployeeHome, manager: renderManagerHome, hrbp: renderCaseHome, owner: renderCaseHome, admin: renderAdmin }[S.role];
   const fn = { home, chat: renderChat, journey: renderJourney, requests: renderRequests, policies: renderPolicies,
-    team: renderManager, cases: renderInbox, insights: renderInsights, admin: renderAdmin }[S.page] || home;
+    profile: renderProfile, team: renderManager, cases: renderInbox, insights: renderInsights, admin: renderAdmin }[S.page] || home;
   fn().catch((e) => { if (S.me) v.innerHTML = `<p class="empty">${esc(e.message)}</p>`; });
 }
 
@@ -365,6 +367,60 @@ async function renderJourney() {
     <div class="panel-b"><ul class="steps steps-wide">${j.steps.map((s) => stepRow(s, true)).join("")}</ul></div></section>`;
   bindRibbon();
   document.querySelectorAll("[data-ask]").forEach((b) => b.onclick = () => go("chat", { ask: (ar ? "ما وضع " : "What's the status of ") + b.dataset.ask + "?" }));
+}
+
+async function renderProfile() {
+  const ar = S.lang === "ar"; const L = (en, a) => (ar ? a : en);
+  const p = await api(`/api/employee/${S.user}/profile`);
+  const yes = (v) => v === "true" ? L("Yes", "نعم") : L("No", "لا");
+  const date = (iso) => iso ? new Date(iso.slice(0, 10) + "T12:00:00").toLocaleDateString(ar ? "ar-AE" : "en-GB", { day: "numeric", month: "long", year: "numeric" }) : "—";
+  const MOVE = { ROLE_CHANGE: L("Role change", "تغيير الدور"), TEAM_CHANGE: L("Team change", "تغيير الفريق"), LOCATION_DOMESTIC: L("Move within the UAE", "انتقال داخل الدولة"), LOCATION_INTERNATIONAL: L("International move", "انتقال دولي") };
+  const mob = p.journey_type === "MOBILITY";
+  const row = (k, v) => v ? `<dt>${k}</dt><dd>${v}</dd>` : "";
+  const initials = (p.first_name[0] || "") + (p.last_name[0] || "");
+  $("#view").innerHTML = `${pageHead(L("My profile", "ملفي الشخصي"), L("Your details as held in the HR system. Only you can open this page.", "بياناتك كما هي مسجلة في نظام الموارد البشرية. لا يمكن لغيرك فتح هذه الصفحة."))}
+  <section class="panel profile-hero"><div class="avatar" aria-hidden="true">${esc(initials)}</div>
+    <div><h2 class="profile-name">${esc(p.first_name)} ${esc(p.last_name)}</h2>
+      <p>${esc(p.role_title)}${p.department ? ` · ${esc(p.department)}` : ""}</p>
+      <p class="small muted">${esc(p.location)} · ${esc(p.employee_id)}</p></div>
+    <span class="state-pill ${mob ? "st-AMBER" : "st-GREEN"} profile-pill">${mob ? t("mobility") : t("onboarding")}</span></section>
+  <div class="dash-grid">
+    <section class="panel"><div class="panel-h"><h2>${L("Role", "الوظيفة")}</h2></div><div class="panel-b"><dl class="kv">
+      ${row(L("Designation", "المسمى الوظيفي"), esc(p.role_title))}
+      ${row(L("Team", "الفريق"), esc(p.department))}
+      ${row(L("Grade", "الدرجة"), esc(p.grade))}
+      ${row(L("Location", "الموقع"), esc(p.location))}
+      ${row(L("Employee ID", "الرقم الوظيفي"), esc(p.employee_id))}
+      ${row(L("Username", "اسم المستخدم"), esc(p.username))}
+    </dl></div></section>
+    <section class="panel"><div class="panel-h"><h2>${L("Reporting line", "التسلسل الإداري")}</h2></div><div class="panel-b"><dl class="kv">
+      ${row(L("Reporting manager", "المدير المباشر"), esc(p.manager_name))}
+      ${row(L("HR Business Partner", "شريك الموارد البشرية"), esc(p.hrbp_name))}
+      ${mob && p.releasing_manager_name ? row(L("Previous manager", "المدير السابق"), esc(p.releasing_manager_name)) : ""}
+    </dl>
+    <div class="acts"><button class="btn" id="askHr">${L("Contact my HR partner", "التواصل مع شريك الموارد البشرية")}</button></div></div></section>
+    <section class="panel"><div class="panel-h"><h2>${mob ? L("Your move", "انتقالك") : L("Joining", "الالتحاق")}</h2></div><div class="panel-b"><dl class="kv">
+      ${mob ? `${row(L("Move", "نوع الانتقال"), MOVE[p.move_type] || esc(p.move_type))}
+        ${row(L("From", "من"), [esc(p.from_role_title), esc(p.from_department), esc(p.from_location)].filter(Boolean).join(" · "))}
+        ${row(L("To", "إلى"), [esc(p.role_title), esc(p.department), esc(p.location)].filter(Boolean).join(" · "))}
+        ${row(L("Requested", "تاريخ الطلب"), date(p.journey_anchor_date))}
+        ${row(L("Effective", "تاريخ السريان"), date(p.move_effective_date))}`
+        : `${row(L("Joining date", "تاريخ الالتحاق"), date(p.journey_anchor_date))}
+        ${row(L("Relocating from abroad", "قادم من الخارج"), yes(p.relocating_from_abroad))}
+        ${row(L("Employment visa through the company", "تأشيرة عمل عبر الشركة"), yes(p.visa_required))}
+        ${row(L("Company accommodation", "سكن الشركة"), yes(p.accommodation_eligible))}`}
+    </dl></div></section>
+    <section class="panel"><div class="panel-h"><h2>${L("Preferences", "التفضيلات")}</h2></div><div class="panel-b"><dl class="kv">
+      ${row(L("Preferred language", "اللغة المفضلة"), p.preferred_language === "ar" ? "العربية" : "English")}
+      ${row(L("Family status (for entitlements)", "الحالة العائلية (لأغراض الاستحقاقات)"), p.family_status === "FAMILY" ? L("With family", "مع العائلة") : p.family_status === "SINGLE" ? L("Without dependants", "بدون مُعالين") : "")}
+    </dl>
+    <p class="small muted" style="margin-top:10px">${L("Something not right? HR Operations can correct your record.", "هل هناك خطأ؟ يمكن لعمليات الموارد البشرية تصحيح سجلك.")}</p>
+    <div class="acts"><button class="btn" id="fixRec">${L("Ask HR Operations to correct it", "طلب التصحيح من عمليات الموارد البشرية")}</button>
+      <button class="btn" id="myData">${t("my_data")}</button></div></div></section>
+  </div>`;
+  $("#askHr").onclick = () => go("chat", { ask: L("I'd like to speak with HR about my journey.", "أريد التحدث مع شريك الموارد البشرية بشأن رحلتي.") });
+  $("#fixRec").onclick = () => go("chat", { ask: L("Some of my profile details are wrong. Can HR Operations correct my record?", "بعض بيانات ملفي غير صحيحة. هل يمكن لعمليات الموارد البشرية تصحيح سجلي؟") });
+  $("#myData").onclick = openMyData;
 }
 
 async function renderRequests() {
