@@ -467,7 +467,7 @@ async function loadConversation(j) {
                     intent: m.meta?.intent, mode: m.meta?.mode }, false);
       had = true;
     }
-    if (had) daySep(S.health.as_of, ar ? "الآن" : "Now");
+    if (had) daySep(S.health.as_of, ar ? "اليوم" : "Today");
   }
   startNew(j, had);
   scrollMsgs();
