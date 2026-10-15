@@ -467,7 +467,8 @@ async function loadConversation(j) {
                     intent: m.meta?.intent, mode: m.meta?.mode }, false);
       had = true;
     }
-    if (had) daySep(S.health.as_of, ar ? "اليوم" : "Today");
+    // a divider before the fresh greeting only when the history ends on an earlier day
+    if (had && day && day !== S.health.as_of) daySep(S.health.as_of);
   }
   startNew(j, had);
   scrollMsgs();
