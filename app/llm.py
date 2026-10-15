@@ -30,6 +30,7 @@ Strict rules:
 - Every policy statement must carry its citation in square brackets exactly as given, e.g. [POL-IT-001 §5.1]. Only cite IDs from ALLOWED_POLICY_SECTIONS.
 - If the draft says you are not sure, say plainly that you are not sure and offer the handoff. Do not answer from general knowledge.
 - Do not promise outcomes. Do not say an action is done unless the draft says so; the employee confirms actions with the buttons shown under your reply.
+- Do not list or repeat the options in BUTTONS SHOWN UNDER YOUR REPLY; the employee already sees them. At most say "use the buttons below".
 - Never mention other employees, never reveal sentiment scores to anyone else, never suggest use in performance decisions.
 - Reply in {lang_name}. Keep names, request IDs and citations unchanged."""
 
@@ -79,8 +80,47 @@ def rewrite(emp_id, msg, draft, ev, history=None):
     return validate(text, allowed, draft)
 
 
+_WORD = re.compile(r"\w+", re.U)
+
+
+def _words(s):
+    return {w.lower() for w in _WORD.findall(s) if len(w) > 1 or not w.isascii()}
+
+
+def drop_button_echo(text, labels):
+    """Remove bullet lines that only restate a button label (the buttons are shown under the reply)."""
+    if not labels:
+        return text
+    lab = [_words(l) for l in labels]
+    out, dropped = [], False
+    for line in text.split("\n"):
+        m = re.match(r"^\s*(?:[-*•]|\d+[.)])\s+(.*)$", line)
+        if m:
+            w = _words(re.sub(r"[*_`]", "", m.group(1)))
+            if w and any(len(w & l) / len(w) >= 0.8 for l in lab):
+                dropped = True
+                continue
+        out.append(line)
+    if not dropped:
+        return text
+    # a lead-in that now introduces nothing ("...the options below:") ends with a full stop instead
+    for i in range(len(out) - 1, -1, -1):
+        if out[i].strip():
+            if out[i].rstrip().endswith(":"):
+                out[i] = out[i].rstrip()[:-1].rstrip() + "."
+            break
+    fixed = []
+    for i, line in enumerate(out):
+        nxt = next((x for x in out[i + 1:] if x.strip()), "")
+        if line.rstrip().endswith(":") and not re.match(r"^\s*(?:[-*•]|\d+[.)])\s+", nxt):
+            line = line.rstrip()[:-1].rstrip() + "."
+        fixed.append(line)
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(fixed)).strip()
+
+
 def validate(text, allowed, draft):
     """Drop citations that were not provided; re-attach sources if the model lost them."""
+    text = drop_button_echo(text, [a["label"] for a in getattr(draft, "actions", [])])
     def fix(m):
         c = re.sub(r"\s*§\s*", " §", m.group(1).strip()).rstrip(".")
         return f"[{c}]" if c in allowed else ""
