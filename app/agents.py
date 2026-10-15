@@ -59,8 +59,33 @@ def _emp(emp_id):
     return pack.employees[emp_id]
 
 
+OPEN = ("OPEN", "IN_PROGRESS", "PENDING_INFO", "ACKNOWLEDGED")
+
+
+def open_request(emp_id, key=None, subject=None):
+    """An open request the companion already raised for this employee (same type), if any."""
+    for r in reversed(state.requests_for(emp_id)):
+        if r.get("status") in OPEN and ((key and r.get("request_key") == key) or (subject and r.get("subject") == subject)):
+            return r
+    return None
+
+
+def open_handoff(emp_id, owner_name):
+    """An open employee handoff to the same named owner, if any."""
+    for c in reversed(state.cases(employee_id=emp_id)):
+        if c["type"] == "EMPLOYEE_HANDOFF" and c["status"] in OPEN and c["owner"]["name"] == owner_name:
+            return c
+    return None
+
+
 def raise_request(emp_id, key, subject, description, linked_step=None, actor="employee"):
     spec = config.REQUEST_TYPES[key]
+    existing = open_request(emp_id, key, subject)
+    if existing:  # never raise the same thing twice; point to the open one
+        return {"request": existing, "agent": AGENT_DESK.get(spec["team"], spec["team"]), "duplicate": True,
+                "agent_reply": f"You already have this request open ({existing['request_id']}, {existing['status'].replace('_', ' ').lower()}). Nothing new was raised.",
+                "agent_reply_ar": f"لديك هذا الطلب مفتوحاً بالفعل ({existing['request_id']}). لم يتم فتح طلب جديد.",
+                "policy": _cites([spec["policy"]])}
     owners = {"IT Service Desk": "Kevin Lim", "Learning & Development": "Leila Haddad", "Facilities": "Joseph Dsouza",
               "Government Relations (PRO)": "Yousef Al Hammadi", "Payroll": "Ravi Shankar",
               "Global Mobility": "Emma Clarke", "HR Operations": "Grace Mensah", "Security": "Saeed Al Nuaimi"}
@@ -70,7 +95,7 @@ def raise_request(emp_id, key, subject, description, linked_step=None, actor="em
         "request_type": spec["request_type"], "linked_event_code": linked_step or "", "subject": subject,
         "description": description, "status": "OPEN", "priority": "MEDIUM", "owner_team": spec["team"],
         "owner_name": owners.get(spec["team"], "Unassigned"), "created_at": now, "last_updated_at": now,
-        "resolved_at": "", "sla_days": spec["sla"], "days_open": 0, "raised_via": "companion",
+        "resolved_at": "", "sla_days": spec["sla"], "days_open": 0, "raised_via": "companion", "request_key": key,
     }
     state.add_request(req)
     reply, reply_ar = AGENT_REPLY.get(key, ("Request received.", "تم استلام الطلب."))
@@ -148,6 +173,10 @@ def escalate(emp_id, ev, step_code=None, include_pulse=False, employee_note="", 
                        for p in usable_pulse(emp_id)][-2:]
         if pulse_lines:
             shared.append("Pulse feedback you chose to share")
+    target = step["escalation"] if step else escalation_owner("HR Business Partner", emp)
+    existing = open_handoff(emp_id, target["name"])
+    if existing:  # one open handoff per owner; show the case that's already with them
+        return {**existing, "duplicate": True}
     if step:
         owner = step["escalation"]
         title = f"{step['label']} — {step['status'].replace('_', ' ').lower()}"

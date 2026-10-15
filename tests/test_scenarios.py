@@ -222,14 +222,18 @@ def test_pulse_shared_only_when_employee_chooses():
     hr = next(a for a in r["actions"] if a["type"] == "ESCALATE" and a["owner"]["role"] == "HR Business Partner")
     c1 = client.post("/api/employee/EMP-1005/actions", json={"action": hr}, headers=H("employee", "EMP-1005")).json()["case"]
     assert "Shared with consent" not in c1["summary"]
+    from app import agents
+    agents.update_case(c1["case_id"], status="RESOLVED")   # one open handoff per owner, so close before the next
     c2 = client.post("/api/employee/EMP-1005/actions", json={"action": hr, "include_pulse": True},
                      headers=H("employee", "EMP-1005")).json()["case"]
     assert "Shared with consent" in c2["summary"]
+    agents.update_case(c2["case_id"], status="RESOLVED")
     # withdraw -> even if asked, pulse is not attached
     client.post("/api/employee/EMP-1005/consent", json={"active": False}, headers=H("employee", "EMP-1005"))
     c3 = client.post("/api/employee/EMP-1005/actions", json={"action": hr, "include_pulse": True},
                      headers=H("employee", "EMP-1005")).json()["case"]
     assert "Shared with consent" not in c3["summary"]
+    agents.update_case(c3["case_id"], status="RESOLVED")
     client.post("/api/employee/EMP-1005/consent", json={"active": True}, headers=H("employee", "EMP-1005"))
 
 
@@ -403,32 +407,39 @@ def test_profile_is_visible_only_to_the_employee():
     assert client.get("/api/employee/EMP-1001/profile", headers=H("manager", "MGR-204")).status_code == 403
 
 
-def test_conversations_are_threads_private_and_capped():
+def test_one_continuous_conversation_private_and_no_duplicate_actions():
     emp, h = "EMP-1009", H("employee", "EMP-1009")
     client.delete(f"/api/employee/{emp}/conversations", headers=h)
     r1 = client.post(f"/api/employee/{emp}/chat", json={"message": "What's next for me?"}, headers=h).json()
-    assert r1["new_thread"] and r1["thread_id"]
-    r2 = client.post(f"/api/employee/{emp}/chat", json={"message": "Who can see my data?", "thread_id": r1["thread_id"]}, headers=h).json()
-    assert r2["thread_id"] == r1["thread_id"] and not r2["new_thread"]
-    r3 = client.post(f"/api/employee/{emp}/chat", json={"message": "Is there a housing allowance?"}, headers=h).json()
-    assert r3["thread_id"] != r1["thread_id"]
+    r2 = client.post(f"/api/employee/{emp}/chat", json={"message": "Who can see my data?"}, headers=h).json()
+    assert r1["thread_id"] and r2["thread_id"] == r1["thread_id"] and not r2["new_thread"]   # same conversation
     lst = client.get(f"/api/employee/{emp}/threads", headers=h).json()
-    assert [t["id"] for t in lst] == [r3["thread_id"], r1["thread_id"]] and lst[1]["messages"] == 4
+    assert len(lst) == 1 and lst[0]["messages"] == 4
     t = client.get(f"/api/employee/{emp}/threads/{r1['thread_id']}", headers=h).json()
     assert [m["role"] for m in t["messages"]] == ["user", "assistant", "user", "assistant"]
-    assert t["messages"][1]["meta"]["citations"] is not None
-    # nobody else can list, read, continue or delete them
+    # private: nobody else can read or continue it
     other = H("employee", "EMP-1001")
     assert client.get(f"/api/employee/{emp}/threads", headers=other).status_code == 403
     assert client.get(f"/api/employee/EMP-1001/threads/{r1['thread_id']}", headers=other).status_code == 404
     hijack = client.post("/api/employee/EMP-1001/chat", json={"message": "hi", "thread_id": r1["thread_id"]}, headers=other).json()
     assert hijack["thread_id"] != r1["thread_id"]
     assert client.get(f"/api/employee/{emp}/threads", headers=H("hrbp", "HRBP-01")).status_code == 403
-    # delete one, then cap at 10
-    assert client.delete(f"/api/employee/{emp}/threads/{r3['thread_id']}", headers=h).json()["ok"]
-    for i in range(12):
-        client.post(f"/api/employee/{emp}/chat", json={"message": f"What's next for me? ({i})"}, headers=h)
-    lst = client.get(f"/api/employee/{emp}/threads", headers=h).json()
-    assert len(lst) == 10 and r1["thread_id"] not in [x["id"] for x in lst]
+    # clearing starts afresh
     client.delete(f"/api/employee/{emp}/conversations", headers=h)
     assert client.get(f"/api/employee/{emp}/threads", headers=h).json() == []
+
+
+def test_actions_are_never_triggered_twice():
+    emp, h = "EMP-1001", H("employee", "EMP-1001")
+    r = ask(emp, "It's my first week and I still don't have a laptop. What do I do?")
+    loan = next(a for a in r["actions"] if a.get("request_key") == "IT_LOAN_DEVICE")
+    a1 = client.post(f"/api/employee/{emp}/actions", json={"action": loan}, headers=h).json()
+    a2 = client.post(f"/api/employee/{emp}/actions", json={"action": loan}, headers=h).json()
+    assert a2.get("duplicate") and a2["request"]["request_id"] == a1["request"]["request_id"]
+    esc = next(a for a in r["actions"] if a["type"] == "ESCALATE" and a["owner"]["name"] == "Priya Raman")
+    c1 = client.post(f"/api/employee/{emp}/actions", json={"action": esc}, headers=h).json()["case"]
+    c2 = client.post(f"/api/employee/{emp}/actions", json={"action": esc}, headers=h).json()["case"]
+    assert c2.get("duplicate") and c2["case_id"] == c1["case_id"]
+    st = client.get(f"/api/employee/{emp}/action-state", headers=h).json()
+    assert any(q["key"] == "IT_LOAN_DEVICE" for q in st["requests"]) and any(c["owner"] == "Priya Raman" for c in st["cases"])
+    assert client.get(f"/api/employee/{emp}/action-state", headers=H("employee", "EMP-1002")).status_code == 403

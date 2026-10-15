@@ -248,6 +248,16 @@ def run_action(emp_id: str, body: ActionIn, u: dict = Depends(require_self)):
     raise HTTPException(400, "Unknown action")
 
 
+@app.get("/api/employee/{emp_id}/action-state")
+def action_state(emp_id: str, u: dict = Depends(require_self)):
+    """What the employee has already set in motion, so the chat can show those actions as done."""
+    reqs = [{"key": r.get("request_key"), "subject": r["subject"], "request_id": r["request_id"], "status": r["status"]}
+            for r in state.requests_for(emp_id) if r.get("status") in agents.OPEN]
+    cases = [{"owner": c["owner"]["name"], "case_id": c["case_id"], "status": c["status"]}
+             for c in state.cases(employee_id=emp_id) if c["type"] == "EMPLOYEE_HANDOFF" and c["status"] in agents.OPEN]
+    return {"requests": reqs, "cases": cases}
+
+
 @app.get("/api/employee/{emp_id}/notifications")
 def notifications(emp_id: str, u: dict = Depends(require_self)):
     return state.notifications(emp_id, 30)

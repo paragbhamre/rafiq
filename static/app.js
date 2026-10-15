@@ -399,48 +399,36 @@ async function renderEmployeeHome() {
 async function renderChat() {
   const id = S.user; const ar = S.lang === "ar"; const L = (en, a) => (ar ? a : en);
   if (S.chatEl && S.chatKey === `${id}|${S.lang}`) {
-    $("#view").innerHTML = ""; $("#view").appendChild(S.chatEl); refreshSide(); loadThreads(); return askPending();
+    $("#view").innerHTML = ""; $("#view").appendChild(S.chatEl); refreshSide(); refreshActionState(); return askPending();
   }
   const j = S.journey = await loadJourney(id);
   const wrap = document.createElement("div"); wrap.className = "chat-page";
   wrap.innerHTML = `
-  <div class="chat-col with-threads">
+  <div class="chat-col">
     ${pageHead(L("Ask Rafiq", "اسأل رفيق"), L("Answers from your policies and your journey, with the source. Rafiq never approves or decides; people do.", "إجابات من سياساتك ورحلتك، مع ذكر المصدر. ورفيق لا يقرر نيابة عن أحد."))}
     <div class="ctx" id="ctx"></div>
-    <div class="chat-shell">
-    <aside class="threads" aria-label="${L("Your conversations", "محادثاتك")}">
-      <button class="btn new-thread" id="newThread">＋ ${L("New conversation", "محادثة جديدة")}</button>
-      <button class="linkbtn t-toggle" id="tToggle" aria-expanded="false">${L("Your conversations", "محادثاتك")} <span id="tCount"></span></button>
-      <div class="t-list" id="tList"></div>
-      <p class="t-note">${L("Only you can see these. Kept for 90 days; the 10 most recent are kept.", "لا يراها غيرك. تُحفظ 90 يوماً، ويُحتفظ بآخر 10 محادثات.")}</p>
-    </aside>
     <section class="panel chat" aria-label="Chat">
       <div class="msgs" id="msgs" aria-live="polite"></div>
       <div class="typing hidden" id="typing"><span></span><span></span><span></span> ${t("thinking")}</div>
       <div class="suggest" id="suggest"></div>
       <form class="composer" id="composer"><textarea id="input" rows="1" placeholder="${t("ask")}" aria-label="${t("ask")}"></textarea><button class="btn primary" type="submit">${t("send")}</button></form>
     </section>
-    </div>
   </div>`;
   $("#view").innerHTML = ""; $("#view").appendChild(wrap);
   S.chatEl = wrap; S.chatKey = `${id}|${S.lang}`;
   renderCtx(j);
   S.threadId = null;
-  startNew(j);
+  await loadConversation(j);
   $("#composer").addEventListener("submit", (ev) => { ev.preventDefault(); send(); });
   $("#input").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.shiftKey) { ev.preventDefault(); send(); } });
   $("#input").addEventListener("input", (ev) => { ev.target.style.height = "auto"; ev.target.style.height = Math.min(140, ev.target.scrollHeight) + "px"; });
   $("#suggest").addEventListener("click", (ev) => { const b = ev.target.closest("button"); if (b) { $("#input").value = b.textContent; send(); } });
   $("#ctx").addEventListener("click", (ev) => { if (ev.target.closest("[data-go]")) go(ev.target.closest("[data-go]").dataset.go); });
-  $("#newThread").onclick = () => { S.threadId = null; startNew(S.journey); renderThreadList(); $("#input").focus(); closeThreadsMobile(); };
-  $("#tToggle").onclick = () => { const open = $(".threads").classList.toggle("open"); $("#tToggle").setAttribute("aria-expanded", open); };
-  loadThreads();
   askPending();
 }
 
-function startNew(j) {
+function startNew(j, hasHistory = false) {
   const ar = S.lang === "ar"; const L = (en, a) => (ar ? a : en);
-  $("#msgs").innerHTML = "";
   // Short greeting from the journey (the full picture is one question away, and on Home)
   const label = (s) => ar ? s.label_ar : s.label;
   const late = j.steps.filter((s) => ["STALLED", "AT_RISK"].includes(s.status));
@@ -457,48 +445,71 @@ function startNew(j) {
   late.slice(0, 2).forEach((s) => { const q = (ar ? "ما وضع " : "What's happening with ") + label(s) + "?"; if (!prompts.some((p) => p.includes(label(s)))) prompts.push(q); });
   prompts.push(...(ar ? ["ما هي خطواتي التالية؟", "من يمكنه رؤية بياناتي؟"] : ["What's next for me?", "Who can see my data?"]));
   $("#suggest").innerHTML = [...new Set(prompts)].slice(0, 5).map((p) => `<button>${esc(p)}</button>`).join("");
-  $("#suggest").classList.remove("hidden");
+  $("#suggest").classList.toggle("hidden", hasHistory);
 }
 
-async function loadThreads() {
-  try { S.threads = await api(`/api/employee/${S.user}/threads`); } catch { S.threads = []; }
-  renderThreadList();
+// One continuous conversation: reload it (with day separators), then a fresh status greeting
+async function loadConversation(j) {
+  const ar = S.lang === "ar";
+  $("#msgs").innerHTML = "";
+  await refreshActionState();
+  let threads = [];
+  try { threads = await api(`/api/employee/${S.user}/threads`); } catch { threads = []; }
+  let had = false;
+  if (threads.length) {
+    const t = await api(`/api/employee/${S.user}/threads/${threads[0].id}`);
+    S.threadId = threads[0].id; let day = "";
+    for (const m of t.messages) {
+      const d = (m.at || "").slice(0, 10);
+      if (d && d !== day) { day = d; daySep(d); }
+      if (m.role === "user") addMe(m.text);
+      else addBot({ reply: m.text, citations: m.meta?.citations || [], actions: m.meta?.actions || [], lang: m.meta?.lang || S.lang,
+                    intent: m.meta?.intent, mode: m.meta?.mode }, false);
+      had = true;
+    }
+    if (had) daySep(S.health.as_of, ar ? "الآن" : "Now");
+  }
+  startNew(j, had);
+  scrollMsgs();
 }
-function renderThreadList() {
-  const ar = S.lang === "ar"; const L = (en, a) => (ar ? a : en);
-  const el = $("#tList"); if (!el) return;
-  $("#tCount").textContent = S.threads?.length ? `(${S.threads.length})` : "";
-  el.innerHTML = (S.threads || []).length ? S.threads.map((t) => `<div class="t-item ${t.id === S.threadId ? "on" : ""}" data-id="${t.id}">
-      <button class="t-open" data-id="${t.id}"><span class="t-title">${esc(t.title === "Earlier conversation" && ar ? "محادثة سابقة" : t.title)}</span><span class="t-date">${fmtDate(t.last_at)}</span></button>
-      <button class="t-del" data-id="${t.id}" title="${L("Delete this conversation", "حذف هذه المحادثة")}" aria-label="${L("Delete this conversation", "حذف هذه المحادثة")}">×</button></div>`).join("")
-    : `<p class="t-empty">${L("Your conversations will appear here.", "ستظهر محادثاتك هنا.")}</p>`;
-  el.querySelectorAll(".t-open").forEach((b) => b.onclick = () => openThread(b.dataset.id));
-  el.querySelectorAll(".t-del").forEach((b) => b.onclick = async () => {
-    if (!b.classList.contains("sure")) { b.classList.add("sure"); b.textContent = L("Delete?", "حذف؟"); setTimeout(() => { b.classList.remove("sure"); b.textContent = "×"; }, 3000); return; }
-    await api(`/api/employee/${S.user}/threads/${b.dataset.id}`, { method: "DELETE" });
-    if (S.threadId === b.dataset.id) { S.threadId = null; startNew(S.journey); }
-    toast(L("Conversation deleted.", "تم حذف المحادثة.")); loadThreads();
+function daySep(iso, label) {
+  const ar = S.lang === "ar";
+  const txt = label || (iso === S.health.as_of ? (ar ? "اليوم" : "Today") : fmtDate(iso));
+  const d = document.createElement("div"); d.className = "day-sep"; d.innerHTML = `<span>${esc(txt)}</span>`; $("#msgs").appendChild(d);
+}
+async function refreshActionState() {
+  try { S.actState = await api(`/api/employee/${S.user}/action-state`); } catch { S.actState = { requests: [], cases: [] }; }
+  // re-mark any buttons already on screen
+  document.querySelectorAll("#msgs .acts .btn[data-i]").forEach((b) => {
+    const a = b._action; if (!a) return; const done = actionDone(a); if (done) b.replaceWith(doneChip(a, done));
   });
 }
-async function openThread(id) {
-  finishTyping();
-  const t = await api(`/api/employee/${S.user}/threads/${id}`);
-  S.threadId = id; $("#msgs").innerHTML = ""; $("#suggest").classList.add("hidden");
-  for (const m of t.messages) {
-    if (m.role === "user") addMe(m.text);
-    else addBot({ reply: m.text, citations: m.meta?.citations || [], actions: m.meta?.actions || [], lang: m.meta?.lang || S.lang,
-                  intent: m.meta?.intent, mode: m.meta?.mode, restored: true }, false);
-  }
-  scrollMsgs(); renderThreadList(); closeThreadsMobile(); $("#input").focus();
+function actionDone(a) {
+  const st = S.actState || { requests: [], cases: [] };
+  if (a.type === "RAISE_REQUEST") { const q = st.requests.find((x) => x.key === a.request_key); return q ? q.request_id : null; }
+  if (a.type === "ESCALATE") { const c = st.cases.find((x) => x.owner === a.owner?.name); return c ? c.case_id : null; }
+  return null;
 }
-function closeThreadsMobile() { $(".threads")?.classList.remove("open"); $("#tToggle")?.setAttribute("aria-expanded", "false"); }
+function doneChip(a, ref) {
+  const ar = S.lang === "ar"; const sp = document.createElement("span"); sp.className = "act-old done";
+  const what = a.type === "ESCALATE" ? (ar ? `تم التحويل إلى ${a.owner.name}` : `Handed to ${a.owner.name}`) : a.label;
+  sp.textContent = `✓ ${what} · ${ref}`; return sp;
+}
 function renderCtx(j) {
   const ar = S.lang === "ar"; const L = (en, a) => (ar ? a : en);
   const late = j.steps.filter((s) => ["STALLED", "AT_RISK"].includes(s.status)).length;
   const el = $("#ctx"); if (!el) return;
   el.innerHTML = `<span>${esc(ar ? j.stage_label_ar : j.stage_label)}</span><span>${j.progress.done}/${j.progress.total} ${L("steps", "خطوات")}</span>
     ${late ? `<span><span class="mk mk-r"></span>${late} ${L("behind", "متأخرة")}</span>` : `<span>${L("On track", "وفق الخطة")}</span>`}
-    <button class="linkbtn" data-go="journey">${L("View journey", "عرض الرحلة")}</button>`;
+    <button class="linkbtn" data-go="journey">${L("View journey", "عرض الرحلة")}</button>
+    <button class="linkbtn ctx-clear" id="clearConv">${L("Clear conversation", "مسح المحادثة")}</button>`;
+  $("#clearConv").onclick = async (e) => {
+    const b = e.currentTarget;
+    if (!b.classList.contains("sure")) { b.classList.add("sure"); b.textContent = L("Clear it? Click again", "تأكيد المسح؟ اضغط مجدداً"); setTimeout(() => { b.classList.remove("sure"); b.textContent = L("Clear conversation", "مسح المحادثة"); }, 3500); return; }
+    await api(`/api/employee/${S.user}/conversations`, { method: "DELETE" });
+    finishTyping(); S.threadId = null; $("#msgs").innerHTML = ""; startNew(S.journey); toast(L("Conversation cleared.", "تم مسح المحادثة."));
+    b.classList.remove("sure"); b.textContent = L("Clear conversation", "مسح المحادثة");
+  };
 }
 function askPending() { if (S.pendingAsk) { $("#input").value = S.pendingAsk; S.pendingAsk = null; send(); } else $("#input")?.focus(); }
 
@@ -683,10 +694,14 @@ function addBot(r, scroll = true) {
   const d = document.createElement("div"); d.className = "msg bot" + (r.stream ? " streaming" : "");
   const extra = r.citations.filter((c) => !r.reply.includes(c.cite));
   d.innerHTML = `<span class="bot-av" aria-hidden="true">R</span><div class="bot-main"><div class="body" dir="${r.lang === "ar" ? "rtl" : "ltr"}">${md(r.reply)}</div>
-    ${r.actions.length ? (r.restored ? restoredActs(r.actions) : `<div class="acts">${r.actions.map((a, i) => `<button class="btn ${a.primary ? "primary" : ""}" data-i="${i}">${esc(a.label)}</button>`).join("")}</div>`) : ""}
+    ${r.actions.length ? `<div class="acts">${r.actions.map((a, i) => `<button class="btn ${a.primary ? "primary" : ""}" data-i="${i}">${esc(a.label)}</button>`).join("")}</div>` : ""}
     ${extra.length ? `<div class="meta">${t("sources")}: ${extra.map((c) => `<button class="cite" data-cite="${c.cite}">${c.cite}</button>`).join("")}</div>` : ""}
     ${r.mode && r.mode !== "offline" && r.intent !== "BRIEF" ? `<div class="meta">${r.mode === "offline_fallback" ? (S.lang === "ar" ? "إجابة قياسية من الحقائق المؤكدة" : "Standard answer from verified facts") : (S.lang === "ar" ? "صاغها الذكاء الاصطناعي من الحقائق والمصادر المؤكدة فقط" : "Worded by AI from verified facts and the sources shown only")}</div>` : ""}</div>`;
-  if (!r.restored) d.querySelectorAll(".acts .btn").forEach((b) => b.addEventListener("click", () => doAction(r.actions[+b.dataset.i], b)));
+  d.querySelectorAll(".acts .btn").forEach((b) => {
+    const a = r.actions[+b.dataset.i]; b._action = a;
+    const done = actionDone(a);
+    if (done) b.replaceWith(doneChip(a, done)); else b.addEventListener("click", () => doAction(a, b));
+  });
   $("#msgs").appendChild(d); if (scroll) scrollMsgs();
   if (r.stream) typeOut(d, r);
 }
@@ -720,15 +735,6 @@ function typeOut(d, r) {
   d.addEventListener("click", (e) => { if (S._typing === done && !e.target.closest(".cite")) done(); }, { once: true });
 }
 function finishTyping() { if (S._typing) S._typing(); }
-function restoredActs(actions) {
-  // Buttons in an earlier conversation can't be pressed again; done ones are ticked
-  const ar = S.lang === "ar"; const reqs = (S.journey?.requests || []).map((q) => q.subject);
-  return `<div class="acts acts-old">${actions.map((a) => {
-    const done = a.type === "RAISE_REQUEST" && reqs.includes(a.label);
-    return `<span class="act-old ${done ? "done" : ""}">${done ? "✓ " : ""}${esc(a.label)}</span>`;
-  }).join("")}<span class="act-note">${ar ? "من محادثة سابقة. اسأل مجدداً لاتخاذ إجراء." : "From an earlier conversation. Ask again to act on it."}</span></div>`;
-}
-
 async function send() {
   const inp = $("#input"); const text = inp.value.trim(); if (!text) return;
   finishTyping();
@@ -737,8 +743,7 @@ async function send() {
   try {
     const r = await api(`/api/employee/${S.user}/chat`, { method: "POST", body: JSON.stringify({ message: text, lang: S.lang, thread_id: S.threadId || null }) });
     addBot({ ...r, stream: true });
-    if (r.thread_id !== S.threadId) { S.threadId = r.thread_id; }
-    loadThreads();
+    S.threadId = r.thread_id;
   }
   catch (e) { addBot({ reply: e.message, citations: [], actions: [], lang: S.lang }); }
   finally { $("#typing").classList.add("hidden"); }
@@ -752,8 +757,8 @@ async function doAction(a, btn) {
     const r = await api(`/api/employee/${S.user}/actions`, { method: "POST", body: JSON.stringify({ action: a }) });
     const ar = S.lang === "ar";
     const req = r.request;
-    addBot({ reply: `**${esc(r.agent)}** — ${ar ? r.agent_reply_ar : r.agent_reply}\n\n${t("sent_req", { agent: r.agent, id: req.request_id })}`, citations: [], actions: [], lang: S.lang });
-    btn.textContent = "✓ " + btn.textContent; refreshSide();
+    addBot({ reply: r.duplicate ? `${ar ? r.agent_reply_ar : r.agent_reply}` : `**${esc(r.agent)}** — ${ar ? r.agent_reply_ar : r.agent_reply}\n\n${ar ? `رقم الطلب ${req.request_id}.` : `Request ${req.request_id} raised.`}`, citations: [], actions: [], lang: S.lang });
+    await refreshActionState(); refreshSide();
   } catch (e) { toast(e.message); btn.disabled = false; }
 }
 
@@ -777,11 +782,16 @@ function confirmEscalation(a, btn) {
     $("#ok").disabled = true;
     try {
       const r = await api(`/api/employee/${S.user}/actions`, { method: "POST", body: JSON.stringify({ action: a, include_pulse: !!($("#incPulse") && $("#incPulse").checked), note: $("#note").value }) });
-      dlg.close(); btn.disabled = true; btn.textContent = "✓ " + btn.textContent;
+      dlg.close();
       const c = r.case;
+      if (c.duplicate) {
+        addBot({ reply: ar ? `هذا الأمر لدى **${c.owner.name}** بالفعل (الحالة **${c.case_id}**). لم يتم إرسال أي شيء جديد.`
+          : `This is already with **${c.owner.name}** (case **${c.case_id}**). Nothing new was sent.`, citations: [], actions: [], lang: S.lang });
+        await refreshActionState(); return;
+      }
       addBot({ reply: (ar ? `تم التحويل إلى **${c.owner.name}** (${c.owner.role}). رقم الحالة **${c.case_id}**. ستتلقى تحديثاً بحلول ${c.next_update_due}. تمت مشاركة: ${c.shared_items.join("، ")}.`
         : `Handed to **${c.owner.name}** (${c.owner.role}). Case **${c.case_id}**. You'll hear back by ${fmtDate(c.next_update_due)}. Shared: ${c.shared_items.join(", ")}.`), citations: [], actions: [], lang: S.lang });
-      refreshSide();
+      await refreshActionState(); refreshSide();
     } catch (e) { toast(e.message); $("#ok").disabled = false; }
   };
 }

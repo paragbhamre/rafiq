@@ -670,11 +670,14 @@ def render(draft):
 
 
 def chat(emp_id, msg, ui_lang="en", thread_id=None):
-    """One turn in a conversation. With no thread_id (or one that isn't this employee's) a new
-    conversation is started; the AI writer only sees the history of the current conversation."""
+    """One turn in the employee's conversation. Rafiq keeps one continuous conversation per employee
+    (started on the first message); the AI writer sees its recent history."""
     msg = (msg or "").strip()[:1500]
     if thread_id and not state.thread_get(emp_id, thread_id):
         thread_id = None
+    if not thread_id:  # one continuous conversation per employee: continue the latest
+        latest = state.threads(emp_id)
+        thread_id = latest[0]["id"] if latest else None
     draft, ev = route(emp_id, msg, ui_lang)
     text = render(draft)
     mode = "offline"
