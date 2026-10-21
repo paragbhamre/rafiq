@@ -28,6 +28,7 @@ app = FastAPI(title="Rafiq — Employee Journey Companion", version="1.0.0", lif
 
 @app.middleware("http")
 async def _headers(request, call_next):
+    pack.ensure_current()   # keeps seeded journeys aligned with today after the day changes
     resp = await call_next(request)
     resp.headers["X-Robots-Tag"] = "noindex, nofollow"
     resp.headers["X-Content-Type-Options"] = "nosniff"
@@ -72,7 +73,8 @@ def require_role(*roles):
 # --------------------------------------------------------------------------
 @app.get("/api/health")
 def health():
-    return {"ok": True, "as_of": config.AS_OF.isoformat(), "ai_writer": llm.status()["configured"], "storage": state.health(), "pack": "synthetic" if config.IS_REFERENCE_PACK else config.DATA_DIR.name,
+    return {"ok": True, "as_of": config.AS_OF.isoformat(), "pack_reference_date": config.PACK_REFERENCE_DATE.isoformat(),
+            "pack_shift_days": pack.shift_days, "ai_writer": llm.status()["configured"], "storage": state.health(), "pack": "synthetic" if config.IS_REFERENCE_PACK else config.DATA_DIR.name,
             "employees": len(pack.employees), "synthetic_data": True}
 
 

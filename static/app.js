@@ -5,7 +5,7 @@ const T = {
   en: {
     tagline: "Employee journey companion", role_employee: "Employee", role_manager: "Manager", role_hrbp: "HR partner",
     role_owner: "Service owner", role_insights: "Insights", viewing_as: "Viewing as",
-    banner: "<strong>Prototype.</strong> Synthetic data only. Today is set to {asof}.",
+    banner: "<strong>Prototype.</strong> Synthetic data only. Today: {asof}.",
     your_journey: "Your journey", requests: "Your requests", updates: "Updates", my_data: "My data",
     ask: "Ask Rafiq about your journey, a policy, or something that's stuck…", send: "Send", thinking: "Rafiq is checking your journey…",
     onboarding: "Onboarding", mobility: "Internal move", start: "Offer accepted", join: "Joining day", day30: "Day 30",
@@ -23,7 +23,7 @@ const T = {
   ar: {
     tagline: "رفيق رحلة الموظف", role_employee: "الموظف", role_manager: "المدير", role_hrbp: "شريك الموارد البشرية",
     role_owner: "مالك الخدمة", role_insights: "المؤشرات", viewing_as: "العرض بصفة",
-    banner: "<strong>نموذج أولي.</strong> بيانات افتراضية فقط. تاريخ اليوم مضبوط على {asof}.",
+    banner: "<strong>نموذج أولي.</strong> بيانات افتراضية فقط. اليوم: {asof}.",
     your_journey: "رحلتك", requests: "طلباتك", updates: "التحديثات", my_data: "بياناتي",
     ask: "اسأل رفيق عن رحلتك أو عن سياسة أو عن أمر متأخر…", send: "إرسال", thinking: "رفيق يراجع رحلتك…",
     onboarding: "الالتحاق", mobility: "الانتقال الداخلي", start: "قبول العرض", join: "يوم الالتحاق", day30: "اليوم 30",

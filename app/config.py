@@ -31,8 +31,48 @@ except (OSError, ValueError):
     PACK_META = {}
 RUNTIME_DIR = Path(os.getenv("RAFIQ_RUNTIME_DIR", ROOT / "runtime"))
 
-# "Today" for the prototype. The synthetic pack is built for 2026-10-14.
-AS_OF = dt.date.fromisoformat(os.getenv("RAFIQ_AS_OF") or PACK_META.get("as_of") or "2026-10-14")
+# --------------------------------------------------------------------------
+# Dates. Rafiq always runs on today's date (in RAFIQ_TZ, default Asia/Dubai).
+#
+# A pack is written against a reference date: the day its journeys describe (Aisha on Day 5, ...).
+# The synthetic pack's reference date is 2026-10-14. When the pack loads, every date in it is moved
+# forward by (today - reference date), so each seeded journey looks the same on any day while the
+# app shows real dates. app/data.py re-applies the shift when the day changes.
+#
+#   RAFIQ_PACK_REFERENCE_DATE  reference date of the pack (else pack.json "as_of", else RAFIQ_AS_OF, else 2026-10-14)
+#   RAFIQ_SHIFT_PACK_DATES     "true" (default) moves pack dates to today; "false" evaluates the pack's own dates
+#   RAFIQ_FREEZE_DATE          optional fixed "today" for tests and rehearsals (YYYY-MM-DD)
+#   RAFIQ_TZ                   time zone that decides when the day changes (default Asia/Dubai)
+#
+# RAFIQ_AS_OF is the old name for the reference date and still works as one; it no longer freezes "today".
+# --------------------------------------------------------------------------
+from zoneinfo import ZoneInfo
+
+PACK_REFERENCE_DATE = dt.date.fromisoformat(os.getenv("RAFIQ_PACK_REFERENCE_DATE") or PACK_META.get("as_of")
+                                            or os.getenv("RAFIQ_AS_OF") or "2026-10-14")
+SHIFT_PACK_DATES = os.getenv("RAFIQ_SHIFT_PACK_DATES", "true").strip().lower() not in ("false", "0", "no")
+TZ = ZoneInfo(os.getenv("RAFIQ_TZ", "Asia/Dubai"))
+_FREEZE = os.getenv("RAFIQ_FREEZE_DATE", "").strip()
+FREEZE_DATE = dt.date.fromisoformat(_FREEZE) if _FREEZE else None
+
+
+def today(now=None):
+    """Today's date in RAFIQ_TZ (or RAFIQ_FREEZE_DATE when set). `now` is an aware datetime, for tests."""
+    if FREEZE_DATE:
+        return FREEZE_DATE
+    return (now or dt.datetime.now(dt.timezone.utc)).astimezone(TZ).date()
+
+
+def pack_shift_days(on=None):
+    """Days added to every pack date so the seeded journeys line up with `on` (default today)."""
+    return ((on or today()) - PACK_REFERENCE_DATE).days if SHIFT_PACK_DATES else 0
+
+
+def __getattr__(name):
+    # config.AS_OF is "today", evaluated on every access so a long-running server rolls over at midnight.
+    if name == "AS_OF":
+        return today()
+    raise AttributeError(name)
 
 # LLM provider: "offline" (deterministic, no external calls), "anthropic", or "openai"
 # ("openai" covers any OpenAI-compatible endpoint, including Azure OpenAI and local gateways).

@@ -130,13 +130,14 @@ def run(rep, pack_dir, args):
     guess = inferred.most_common(1)[0][0] if inferred else None
     as_of = args.as_of or config.PACK_META.get("as_of") or guess
     if as_of:
-        os.environ["RAFIQ_AS_OF"] = as_of
-        config.AS_OF = dt.date.fromisoformat(as_of)
+        # Evaluate the pack on its own dates: reference date = as_of, no shift, "today" frozen at as_of
+        os.environ["RAFIQ_PACK_REFERENCE_DATE"] = os.environ["RAFIQ_FREEZE_DATE"] = as_of
+        config.PACK_REFERENCE_DATE = config.FREEZE_DATE = dt.date.fromisoformat(as_of)
     src = "--as-of" if args.as_of else "pack.json" if config.PACK_META.get("as_of") else "inferred from journey_day" if guess else "default"
     rep.add("OK" if as_of else "WARN", f"evaluating as of **{config.AS_OF}** ({src})"
             + ("" if as_of else ". Set it in pack.json: {\"as_of\": \"YYYY-MM-DD\"}"))
     if guess and as_of and guess != as_of:
-        rep.add("WARN", f"the data's journey_day suggests {guess}; set RAFIQ_AS_OF or pack.json to match")
+        rep.add("WARN", f"the data's journey_day suggests {guess}; set RAFIQ_PACK_REFERENCE_DATE or pack.json to match")
 
     # ---------------------------------------------------------------- 3. journeys and owners
     rep.section("3. Journey steps and named owners (journey_maps.md)")

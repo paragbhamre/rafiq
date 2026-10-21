@@ -2,7 +2,7 @@
 
 > **SYNTHETIC DATA ONLY.** Built by APEX Partners as a stand-in while the official challenge pack is pending. Every person, contact, policy and amount is fictional. File names and core columns follow the challenge brief, so the prototype can switch to the official pack by remapping columns.
 
-**As-of date:** `2026-10-14`. All journey days, ages and stalls are computed against this date. The prototype should use a configurable "today", set to this date for demos.
+**Reference date:** `2026-10-14`. The dates in these files describe the journeys as they stand on this day. Rafiq runs on today's date and moves every pack date forward by (today − reference date) when it loads, so each seeded journey (Aisha on Day 5, Rafael on Day −9, …) looks the same on any day. Set `RAFIQ_SHIFT_PACK_DATES=false` to evaluate the files on their own dates.
 
 ## Contents
 
@@ -28,7 +28,7 @@
 | preferred_language | `en` / `ar` | Companion reply language |
 | journey_type | `ONBOARDING` / `MOBILITY` | |
 | journey_stage | enum | See the stage tables in `journey_maps.md` |
-| journey_day | int | Days since `journey_anchor_date` as of 2026-10-14 (negative = pre-arrival) |
+| journey_day | int | Days since `journey_anchor_date` on the reference date 2026-10-14 (negative = pre-arrival) |
 | journey_anchor_date | date | Joining date (onboarding) or move request date (mobility) |
 | move_effective_date | date | Mobility only; anchor plus 30 days |
 | move_type | enum | `ROLE_CHANGE`, `TEAM_CHANGE`, `LOCATION_DOMESTIC`, `LOCATION_INTERNATIONAL` |

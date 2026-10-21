@@ -46,6 +46,8 @@ Open http://localhost:8000 and sign in. Locally the demo password is `rafiq-demo
 
 To reset the demo state, sign in as `admin` and use **Reset demo**.
 
+**Dates.** Rafiq runs on today's date (Dubai time; set `RAFIQ_TZ` to change). The pack is written against a reference date (`RAFIQ_PACK_REFERENCE_DATE`, 2026-10-14 for the synthetic pack), and every date in it is moved forward to today when the app loads and again when the day changes. Each seeded journey therefore looks the same on any day, with real dates on screen. `RAFIQ_FREEZE_DATE` fixes "today" for rehearsals; `RAFIQ_SHIFT_PACK_DATES=false` evaluates the pack on its own dates.
+
 ---
 
 ## What it does (mapped to the brief)

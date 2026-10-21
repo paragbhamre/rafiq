@@ -1,6 +1,6 @@
 # Test Scenarios — Employee Journey Companion (v1)
 
-> Our own stand-in for the judges' hidden scenarios. Each scenario maps to a seeded employee in the mock pack (as-of date **14 Oct 2026**). The prototype should pass all 14 before the demo. Re-check the reference signals with `python3 tools/check_pack.py`.
+> Our own stand-in for the judges' hidden scenarios. Each scenario maps to a seeded employee in the mock pack (reference date **14 Oct 2026**; Rafiq shifts the pack to today, so the Day numbers below hold on any run date). The prototype should pass all 14 before the demo. Re-check the reference signals with `python3 tools/check_pack.py`.
 
 **Pass criteria for every scenario**
 1. Correct journey stage and next step shown.

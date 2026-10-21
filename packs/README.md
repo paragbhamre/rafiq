@@ -47,7 +47,7 @@ RAFIQ_PACK=official uvicorn app.main:app          # click through it locally
 
 ## 5. Switch the live site
 
-Set `RAFIQ_PACK=official` (and `RAFIQ_AS_OF` if the pack has no `pack.json`) on the Render service, then
+Set `RAFIQ_PACK=official` (and `RAFIQ_PACK_REFERENCE_DATE` if the pack has no `pack.json`) on the Render service, then
 sign in as `admin` and reset the demo. To switch back, set `RAFIQ_PACK=synthetic`.
 
 If the official pack can't load, the app refuses to start with the reason (it never runs on half-read data),
