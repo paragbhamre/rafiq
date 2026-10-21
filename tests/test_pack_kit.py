@@ -50,7 +50,7 @@ def test_journey_map_parser_reproduces_built_in_journeys():
 def test_scenario_parser_reads_the_synthetic_scenarios():
     from app import scenarios
     sc = scenarios.parse((ROOT / "data" / "scenarios.md").read_text(encoding="utf-8"), pack.employees)
-    assert [s["id"] for s in sc] == [f"S{i:02d}" for i in range(1, 15)]
+    assert [s["id"] for s in sc] == [f"S{i:02d}" for i in range(1, 15)] + [f"H{i:02d}" for i in range(1, 21)]
     assert sc[0]["employee_id"] == "EMP-1001" and "laptop" in sc[0]["prompt"]
 
 

@@ -359,7 +359,7 @@ def test_reset_and_credentials_are_admin_only():
 def test_sign_in_page_reveals_no_passwords_or_situations():
     d = client.get("/api/demo-accounts").json()
     blob = str(d).lower()
-    assert "test-demo-pass" not in blob and len(d["employees"]) == 14 and d["counts"]["employee"] == 200
+    assert "test-demo-pass" not in blob and len(d["employees"]) == 14 and d["counts"]["employee"] == 220
     for leak in ("laptop", "visa", "stalled", "manages", "partner for", "emp-10", "consent", "tag", "journey"):
         assert leak not in blob, leak
     for e in d["employees"]:
