@@ -12,7 +12,7 @@ Rafiq (رفيق, "companion") gives every new or moving employee one place to as
 
 **Live:** https://rafiq-journey-companion.onrender.com
 
-**Sign-in.** Every person has their own account: 200 employees, 30 managers, 6 HR partners and 7 service owners, plus a demo admin. The sign-in page lists the accounts set up for the test scenarios. Usernames look like `aisha.rahman`, `mgr.hassan.brown`, `hr.nadia.farouk` and `owner.priya.raman`; IDs such as `EMP-1001` also work. Passwords are set in Render (`RAFIQ_DEMO_PASSWORD`, `RAFIQ_ADMIN_PASSWORD`) and are never in this repository. Set `RAFIQ_PASSWORD_MODE=per_user` to give every account a distinct password; the admin can then download the credentials sheet.
+**Sign-in.** Every person has their own account: 220 employees, 30 managers, 6 HR partners and 7 service owners, plus a demo admin. The sign-in page lists the accounts set up for the test scenarios. Usernames look like `aisha.rahman`, `mgr.hassan.brown`, `hr.nadia.farouk` and `owner.priya.raman`; IDs such as `EMP-1001` also work. Passwords are set in Render (`RAFIQ_DEMO_PASSWORD`, `RAFIQ_ADMIN_PASSWORD`) and are never in this repository. Set `RAFIQ_PASSWORD_MODE=per_user` to give every account a distinct password; the admin can then download the credentials sheet.
 
 Identity comes only from a signed, HttpOnly, SameSite session cookie issued by the server (8-hour expiry). Writes require a same-origin request header, and repeated failed sign-ins lock out for 15 minutes. In a pilot, sign-in is replaced by single sign-on (Microsoft Entra ID / OIDC) with the same role rules.
 

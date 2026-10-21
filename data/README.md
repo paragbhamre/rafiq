@@ -8,8 +8,8 @@
 
 | File | Rows | What it holds |
 |---|---|---|
-| `employees.csv` | 200 | 125 onboarding plus 75 internal mobility; stage, manager, HRBP, location, eligibility flags, consent |
-| `journey_events.csv` | ~1,800 | One row per completed journey step (event codes from `journey_maps.md`) plus a few informational events |
+| `employees.csv` | 220 | 136 onboarding plus 84 internal mobility (EMP-1301 to EMP-1320 are the H01–H20 rehearsal cases); stage, manager, HRBP, location, eligibility flags, consent |
+| `journey_events.csv` | ~1,850 | One row per completed journey step (event codes from `journey_maps.md`) plus a few informational events |
 | `service_requests.csv` | ~145 | HR, IT, Facilities, PRO, Payroll, L&D, Security and Mobility requests with status, owner, SLA and days open |
 | `pulse_feedback.csv` | ~120 | Opt-in pulse responses (English and Arabic); `consent_status` is ACTIVE or WITHDRAWN |
 | `policies/` | 13 | Short, citable policy documents (`POL-xxx §n.n`) |
