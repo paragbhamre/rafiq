@@ -28,11 +28,14 @@ TOPICS = [
     ("allowance", r"allowance|\bpaid\b|payment|money|reimburse|بدل|مبلغ", ["RELOCATION_ALLOWANCE_PAID"]),
     ("visa", r"visa|medical|emirates id|entry permit|residency|biometric|تأشيرة|التأشيرة|فحص|الطبي|الهوية", ["VISA_APPLICATION_SUBMITTED", "MEDICAL_COMPLETED", "VISA_ISSUED", "EMIRATES_ID_APPLIED"]),
     ("permit", r"work permit|employment pass|\bpermit\b|تصريح", ["WORK_PERMIT_ISSUED"]),
-    ("accommodation", r"accommodation|housing|\bflat\b|apartment|\baddress\b|hotel|where (will|do|am|shall) i (stay|staying|live|living|sleep)|سكن|السكن", ["ACCOMMODATION_ASSIGNED", "HOUSING_ARRANGED"]),
+    ("accommodation", r"accommodation|housing|\bflat\b|apartment|\baddress\b|hotel|where (will|do|am|shall) i (stay|staying|live|living|sleep)|(nowhere|no ?where|no place|somewhere|place) to (live|stay|sleep)|سكن|السكن", ["ACCOMMODATION_ASSIGNED", "HOUSING_ARRANGED"]),
+    ("relocation", r"relocat|moving (support|package|costs?)|removal|shipment|shipping|household goods", ["RELOCATION_ASSESSED", "RELOCATION_ALLOWANCE_PAID", "HOUSING_ARRANGED"]),
+    ("background", r"background|reference check|haven.?t heard|heard (nothing|anything|back)|no news|not heard|التحقق من الخلفية", ["BACKGROUND_CHECK_CLEARED", "OFFER_ACCEPTED"]),
+    ("checkin", r"check.?in|catch.?up|meant to (check|meet|talk|see)|30.?day|المتابعة|اجتماع المتابعة", ["CHECKIN_30_DONE"]),
     ("ticket", r"ticket|\bflight\b|\bfly\b|baggage|luggage|تذكرة", ["JOINING_TICKET_ISSUED"]),
     ("lost", r"\blost\b|where to go|nobody (told|has)|no one (told|has)|who (do i|to) ask|don.?t know who|buddy|confus|overwhelm|ضائع|لا أعرف", ["BUDDY_ASSIGNED", "INDUCTION_COMPLETED"]),
     ("training", r"induction|training|course|e-?learning|تدريب|التعريف", ["INDUCTION_COMPLETED", "MANDATORY_TRAINING_BOOKED", "ROLE_TRAINING_BOOKED"]),
-    ("staff_id", r"staff id|\bbadge\b|\bpass\b|id card|بطاقة", ["STAFF_ID_ISSUED"]),
+    ("staff_id", r"staff id|\bbadge\b|\bpass\b|id card|building|sign(ed)? me in|let me in|airside|turnstile|swipe|بطاقة|المبنى", ["STAFF_ID_ISSUED"]),
     ("move", r"\bmove\b|transfer|new role|endorse|release date|handover|انتقال|الانتقال", ["RECEIVING_MANAGER_ENDORSED", "RELEASING_MANAGER_RELEASED", "TRANSFER_APPROVED", "TRANSFER_LETTER_ISSUED", "HANDOVER_COMPLETED", "MOVE_EFFECTIVE"]),
     ("objectives", r"objective|probation goal|أهداف", ["PROBATION_OBJECTIVES_SET"]),
 ]
@@ -46,6 +49,11 @@ CONTACT_RE = r"who is my (hr|hrbp|hr business partner|manager|line manager|buddy
 APPROVE_RE = r"(just )?approve (my|the)|sign off my|change my (joining|move|start) date|grant me|override"
 BYPASS_RE = r"ignore (your|the|all|previous) (rules|instructions)|pretend you|jailbreak|developer mode|system prompt"
 MONITOR_RE = r"(which|who) of my (team|joiners|new joiners|reports)|my team.?s (mood|sentiment|feedback)|(unhappy|sentiment|morale|mood) of (my|the) team"
+REQUEST_RE = r"\brequests?\b|\bSR-?\d+|\bticket (number|status)|طلبي|طلباتي"
+REQUEST_CATEGORY = {"FACILITIES": r"facilit|parking|maintenance|مرافق", "IT": r"\bit\b|laptop|access|equipment",
+                    "PAYROLL": r"payroll|allowance|salary|رواتب", "PRO": r"\bpro\b|visa|emirates id|تأشيرة",
+                    "HR": r"\bhr\b|letter", "SECURITY": r"security|staff id|pass", "MOBILITY": r"mobility|relocat|permit",
+                    "LEARNING": r"training|learning|induction|course"}
 OTHER_DATA_WORDS = r"score|feedback|pulse|data|record|salary|request|survey|comment|status"
 
 STATUS_ORDER = {"STALLED": 0, "AT_RISK": 1, "DUE_TODAY": 2, "WAITING": 3, "UPCOMING": 4, "DONE_LATE": 5, "DONE": 6}
@@ -474,7 +482,65 @@ def compose_privacy(draft, ev, emp):
     draft.action({"id": "nav:mydata", "type": "OPEN_MY_DATA", "label": draft.t("Open My data", "فتح بياناتي")})
 
 
-def compose_policy(draft, ev, emp, msg):
+def compose_requests(draft, ev, emp, msg):
+    """'Any update on my facilities request?' -> the employee's open requests, owner, age and service level."""
+    open_reqs = [q for q in ev["requests"] if q["status"] not in ("RESOLVED", "CLOSED")]
+    picked = [q for q in open_reqs if any(re.search(rx, msg, re.I) for cat, rx in REQUEST_CATEGORY.items()
+                                          if q.get("category", "").upper() == cat)]
+    shown = picked or open_reqs
+    if picked and len(picked) == 1:
+        draft.say("Here's where your request stands:", "هذا وضع طلبك:")
+    else:
+        draft.say(f"You have {len(open_reqs)} open request{'s' if len(open_reqs) != 1 else ''}:",
+                  f"لديك {len(open_reqs)} طلبات مفتوحة:")
+    for q in shown[:3]:
+        sla = float(q.get("sla_days") or 0)
+        breach = q.get("sla_state") != "OK"
+        draft.say(f"• **{q['request_id']}** — {q['subject']}. With {q['owner_name']} ({q['owner_team']}), status "
+                  f"{q['status'].replace('_', ' ').lower()}, open {q['days_open']} days against a {sla:g}-day service level"
+                  + (" — **over the service level**." if breach else "."),
+                  f"• **{q['request_id']}** — {q['subject']}. لدى {q['owner_name']} ({q['owner_team']})، الحالة {q['status']}، "
+                  f"مفتوح منذ {q['days_open']} أيام مقابل مستوى خدمة {sla:g} يوم" + (" — **تجاوز مستوى الخدمة**." if breach else "."))
+        if q["status"] == "PENDING_INFO":
+            draft.say(f"  They are waiting for something from you: _{q['description']}_",
+                      f"  الفريق بانتظار معلومات منك: _{q['description']}_")
+            draft.cite("POL-SRV-001 §4.1")
+        if breach:
+            twice = q.get("sla_state") == "BREACHED_2X"
+            draft.policy_line("POL-SRV-001 §3.2" if twice else "POL-SRV-001 §3.1", "  ", "  ")
+            step = next((x for x in ev["steps"] if x["code"] == q.get("linked_event_code")), None)
+            if step:
+                _escalate_action(draft, step, primary=twice)
+            elif twice:
+                _hrbp_action(draft, emp, len(usable_pulse(emp["employee_id"])) > 0)
+    draft.cite("POL-SRV-001 §3.4")
+
+
+def _journey_fallback(draft, ev, emp, msg):
+    """A question about the employee's own situation that matches no topic or policy: rather than
+    'not sure', answer from what is actually stuck in their journey (still no guessing about policy)."""
+    if _looks_like_general_policy(msg.lower()) or not re.search(r"\b(i|i'm|i've|im|my|me|mine)\b|أنا|لي\b|لم ", msg.lower()):
+        return False
+    problems = sorted([s for s in ev["steps"] if s["status"] in ("STALLED", "AT_RISK")],
+                      key=lambda s: (0 if any(b["type"] == "BLOCKING" and b["step"] == s["code"] for b in ev["signals"]) else 1,
+                                     STATUS_ORDER[s["status"]], s["target_day"]))
+    roots = [s for s in problems if not any(w in {p["code"] for p in problems} for w in s.get("waiting_on", []))]
+    problems = roots or problems
+    if not problems:
+        return False
+    draft.intent = "JOURNEY_FALLBACK"
+    draft.say("I can't match that to a specific policy, but here's what is holding things up in your journey right now:",
+              "لا أستطيع ربط سؤالك بسياسة محددة، لكن هذا ما يؤخر رحلتك حالياً:")
+    for s in problems[:2]:
+        draft.steps.append(s["code"])
+        _describe_step(draft, ev, s, emp)
+        _step_policy(draft, s, max_lines=2 if s is problems[0] else 1)
+        _offer_step_actions(draft, ev, s, emp)
+    _maybe_compound(draft, ev, emp)
+    return True
+
+
+def compose_policy(draft, ev, emp, msg, journey_fallback=False):
     q_tokens = [t for t in tokenize(msg) if t not in GENERIC_WORDS]
     vocab = library.idf
     oov = [t for t in q_tokens if t not in vocab and not t.isdigit()]
@@ -484,6 +550,8 @@ def compose_policy(draft, ev, emp, msg):
     top = hits[0] if hits else None
     covered = [t for t in q_tokens if t in vocab]
     weak = (not top) or top["score"] < 4.0 or (oov and len(oov) >= 1) or (q_tokens and len(covered) / len(q_tokens) < 0.5)
+    if weak and journey_fallback and _journey_fallback(draft, ev, emp, msg):
+        return
     if weak:
         draft.unsure = True
         draft.say("I'm not sure — I couldn't find a policy that covers this, and I don't want to guess.",
@@ -610,6 +678,15 @@ def route(emp_id, msg, ui_lang="en"):
             draft.intent = "POLICY"
             compose_policy(draft, ev, emp, msg)
             return draft, ev
+    open_reqs = [q for q in ev["requests"] if q["status"] not in ("RESOLVED", "CLOSED")]
+    if re.search(REQUEST_RE, msg, re.I) and open_reqs:
+        steps_now = {s["code"]: s for s in ev["steps"]}
+        topic_problem_any = any(steps_now.get(c, {}).get("status") in ("STALLED", "AT_RISK")
+                                for _t, cs in matched for c in cs)
+        if not topic_problem_any:
+            draft.intent = "REQUESTS"
+            compose_requests(draft, ev, emp, msg)
+            return draft, ev
     # "how am I doing / what's happening with my move" -> topic if the topic has a problem
     if matched:
         topic, codes = _best_topic(matched, ev)
@@ -641,7 +718,7 @@ def route(emp_id, msg, ui_lang="en"):
         _hrbp_action(draft, emp, len(usable_pulse(emp_id)) > 0)
         return draft, ev
     draft.intent = "POLICY"
-    compose_policy(draft, ev, emp, msg)
+    compose_policy(draft, ev, emp, msg, journey_fallback=True)
     return draft, ev
 
 
@@ -661,7 +738,7 @@ def _best_topic(matched, ev):
 
 
 def _looks_like_general_policy(low):
-    return bool(re.search(r"^(can|is|are|do|does|what is|what are|how much|how many|how long|am i (allowed|entitled|eligible)|what.?s the policy|is there)", low.strip())
+    return bool(re.search(r"^(can|is|are|do|does|what is|what are|how much|how many|how long|am i (allowed|entitled|eligible)|what.?s the policy|is there|what.?s (the|our) (company|emirates)|(the|our) company.?s)", low.strip())
                 or re.search(r"(will|does) the company (pay|cover)|who pays|is it covered|am i (entitled|eligible)", low))
 
 
