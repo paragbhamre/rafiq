@@ -591,3 +591,10 @@ def test_s06_mood_question_explains_withdrawn_consent():
         assert leak not in r["reply"], leak
     assert any(a["type"] == "OPEN_MY_DATA" for a in r["actions"])
     assert ask("EMP-1001", "Do you think I am ready for induction?")["intent"] != "MOOD_QUESTION"
+
+
+def test_s06_my_data_says_withdrawn_not_just_not_opted_in():
+    d = client.get("/api/employee/EMP-1006/mydata", headers=H("employee", "EMP-1006")).json()
+    assert d["consent"]["state"] == "WITHDRAWN"
+    assert all(p["used_by_companion"] is False for p in d["pulse"]) and not d["shared_with_others"]
+    assert client.get("/api/employee/EMP-1009/mydata", headers=H("employee", "EMP-1009")).json()["consent"]["state"] in ("ACTIVE", "NOT_OPTED_IN")

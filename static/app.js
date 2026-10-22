@@ -891,7 +891,7 @@ async function openMyData() {
   <div class="dlg-h"><div><h2>${t("my_data")}</h2><p class="small muted">${L("Everything Rafiq holds about you, and who it has been shared with.", "كل ما يحتفظ به رفيق عنك، ومع من تمت مشاركته.")} ${citeBtn("POL-PRV-001 §4.1")}</p></div></div>
   <div class="dlg-b">
     <div class="md-sec"><h3>${L("Check-in feedback consent", "الموافقة على ملاحظات الاستطلاع")}</h3>
-      <div class="switch"><span class="state-pill ${d.consent.pulse_active ? "st-GREEN" : "st-AMBER"}">${d.consent.pulse_active ? L("Opted in", "موافق") : L("Not opted in", "غير موافق")}</span>
+      <div class="switch"><span class="state-pill ${d.consent.pulse_active ? "st-GREEN" : "st-AMBER"}">${d.consent.pulse_active ? L("Opted in", "موافق") : d.consent.state === "WITHDRAWN" ? L("Withdrawn", "تم سحب الموافقة") : L("Not opted in", "غير موافق")}</span>
       <button class="btn" id="consentBtn">${d.consent.pulse_active ? L("Withdraw consent", "سحب الموافقة") : L("Opt in", "الموافقة")}</button></div>
       <p class="small muted" style="margin-top:6px">${L("If you withdraw, your responses stop being used immediately and are deleted within 30 days. It has no effect on the help you get.", "عند السحب يتوقف استخدام ردودك فوراً وتُحذف خلال 30 يوماً، دون أي أثر على الخدمة التي تتلقاها.")}</p></div>
     <div class="md-sec"><h3>${L("Your check-in responses", "ردودك في الاستطلاع")}</h3>

@@ -319,6 +319,9 @@ def mydata(emp_id: str, u: dict = Depends(require_self)):
     return {
         "profile": _public_employee(pack.employees[emp_id]),
         "consent": {"pulse_active": active,
+                    # "WITHDRAWN" when they had opted in and withdrew, not just "not opted in"
+                    "state": "ACTIVE" if active else ("WITHDRAWN" if (state.consent_get(emp_id) == "WITHDRAWN" or any(
+                        p["consent_status"] == "WITHDRAWN" for p in pack.pulse.get(emp_id, []))) else "NOT_OPTED_IN"),
                     "log": state.consent_log(emp_id)},
         "journey_events": pack.events.get(emp_id, []),
         "requests": ev["requests"],
