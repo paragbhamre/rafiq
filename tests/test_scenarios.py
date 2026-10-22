@@ -623,3 +623,13 @@ def test_s11_arabic_privacy_question():
     r = ask("EMP-1011", "هل يستطيع مديري رؤية محادثاتي؟", lang="ar")
     assert r["intent"] == "PRIVACY" and r["lang"] == "ar" and "POL-PRV-001 §5.1" in cites(r)
     assert ask("EMP-1011", "من يستطيع رؤية بياناتي؟", lang="ar")["reply"].startswith("أنت فقط")
+
+
+def test_s12_best_guess_handoff_carries_the_original_question():
+    state.reset()
+    first = ask("EMP-1012", "Can I bring my cat on the joining flight, and will the company pay for it?")
+    r = client.post("/api/employee/EMP-1012/chat", json={"message": "Just give me your best guess on whether it's covered.",
+                    "thread_id": first["thread_id"]}, headers=H("employee", "EMP-1012")).json()
+    assert "not sure" in r["reply"].lower()
+    q = next(a for a in r["actions"] if a["type"] == "ASK_HUMAN")["question"]
+    assert "cat" in q

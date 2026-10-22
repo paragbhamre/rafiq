@@ -769,6 +769,7 @@ async function doAction(a, btn) {
   if (a.type === "OPEN_MY_DATA") return openMyData();
   if (a.type === "ESCALATE") return confirmEscalation(a, btn);
   if (a.type === "RAISE_REQUEST") return confirmRequest(a, btn);
+  if (a.type === "ASK_HUMAN") return confirmQuestion(a, btn);
   btn.disabled = true;
   try {
     const r = await api(`/api/employee/${S.user}/actions`, { method: "POST", body: JSON.stringify({ action: a }) });
@@ -809,6 +810,33 @@ async function confirmRequest(a, btn) {
       dlg.close();
       const req = r.request;
       addBot({ reply: r.duplicate ? `${ar ? r.agent_reply_ar : r.agent_reply}` : `**${esc(r.agent)}** — ${ar ? r.agent_reply_ar : r.agent_reply}\n\n${ar ? `رقم الطلب ${req.request_id}.` : `Request ${req.request_id} raised.`}`, citations: [], actions: [], lang: S.lang });
+      await refreshActionState(); refreshSide();
+    } catch (e) { toast(e.message); $("#ok").disabled = false; btn.disabled = false; }
+  };
+}
+
+// Unanswered question to HR Operations: show (and let the employee edit) exactly what is sent
+function confirmQuestion(a, btn) {
+  const ar = S.lang === "ar";
+  $("#dlgInner").innerHTML = `
+    <div class="dlg-h"><h2>${ar ? "إرسال سؤالك إلى عمليات الموارد البشرية؟" : "Send your question to HR Operations?"}</h2></div>
+    <div class="dlg-b">
+      <p class="muted">${ar ? "سيرد عليك الفريق مباشرة خلال 3 أيام عمل." : "They will reply to you directly within 3 working days."}</p>
+      <label class="small" for="q" style="display:block;margin-top:8px">${ar ? "سؤالك (يمكنك تعديله):" : "Your question (you can edit it):"}</label>
+      <textarea id="q" maxlength="500" dir="auto">${esc(a.question || "")}</textarea>
+      <p class="small muted" style="margin-top:8px">${t("share_never")}</p>
+    </div>
+    <div class="dlg-f"><button class="btn" id="cx">${t("cancel")}</button><button class="btn primary" id="ok">${ar ? "إرسال" : "Send question"}</button></div>`;
+  const dlg = $("#dlg"); dlg.className = ""; dlg.showModal();
+  $("#cx").onclick = () => dlg.close();
+  $("#ok").onclick = async () => {
+    const q = $("#q").value.trim(); if (!q) return;
+    $("#ok").disabled = true; btn.disabled = true;
+    try {
+      const r = await api(`/api/employee/${S.user}/actions`, { method: "POST", body: JSON.stringify({ action: { ...a, question: q } }) });
+      dlg.close();
+      addBot({ reply: ar ? `تم إرسال سؤالك إلى عمليات الموارد البشرية (${r.request.request_id}). سيرد عليك الفريق مباشرة.`
+        : `Your question has gone to HR Operations (${r.request.request_id}). They will reply to you directly.`, citations: [], actions: [], lang: S.lang });
       await refreshActionState(); refreshSide();
     } catch (e) { toast(e.message); $("#ok").disabled = false; btn.disabled = false; }
   };

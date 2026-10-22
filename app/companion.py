@@ -960,6 +960,10 @@ def compose_sensitive(draft, ev, emp):
     draft.policy_line("POL-ALW-001 §6.2", "• ", "• ")
 
 
+FOLLOWUP_RE = (r"best guess|just (tell|give) me|your guess|any idea|roughly|what do you think|"
+               r"just answer|guess anyway|تخمين|خمّن|خمن")
+
+
 def chat(emp_id, msg, ui_lang="en", thread_id=None):
     """One turn in the employee's conversation. Rafiq keeps one continuous conversation per employee
     (started on the first message); the AI writer sees its recent history."""
@@ -977,6 +981,13 @@ def chat(emp_id, msg, ui_lang="en", thread_id=None):
         compose_sensitive(draft, ev, pack.employees[emp_id])
     else:
         draft, ev = route(emp_id, msg, ui_lang)
+    # "Just give me your best guess" after an unsure answer: the handoff carries the ORIGINAL question
+    if thread_id and re.search(FOLLOWUP_RE, msg, re.I):
+        prev = [m for m in _history(emp_id, thread_id) if m["role"] == "user"]
+        if prev:
+            for a in draft.actions:
+                if a["type"] == "ASK_HUMAN":
+                    a["question"] = prev[-1]["text"]
     text = render(draft)
     mode = "offline"
     if config.LLM_PROVIDER != "offline" and not draft.refused and not redacted:
