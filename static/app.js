@@ -469,6 +469,8 @@ async function loadConversation(j) {
     }
     // a divider before the fresh greeting only when the history ends on an earlier day
     if (had && day && day !== S.health.as_of) daySep(S.health.as_of);
+    // the conversation already continued today: don't re-greet in the middle of it after a reload
+    if (had && day === S.health.as_of) { $("#suggest").classList.add("hidden"); scrollMsgs(); return; }
   }
   startNew(j, had);
   scrollMsgs();
