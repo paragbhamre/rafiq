@@ -26,7 +26,7 @@ TOPICS = [
     ("laptop", r"laptop|computer|\bphone\b|\bkit\b|equipment|device|حاسوب|لابتوب|جهاز", ["IT_KIT_ISSUED"]),
     ("access", r"log ?in|access|account|\bemail\b|system|rostering|password|portal|can.?t get into|صلاحي|دخول", ["SYSTEM_ACCESS_GRANTED", "ACCESS_TRANSFERRED"]),
     ("allowance", r"allowance|\bpaid\b|payment|money|reimburse|بدل|مبلغ", ["RELOCATION_ALLOWANCE_PAID"]),
-    ("visa", r"visa|medical|emirates id|entry permit|residency|biometric|paperwork|\bpapers\b|immigration|تأشيرة|التأشيرة|فحص|الطبي|الهوية", ["VISA_APPLICATION_SUBMITTED", "MEDICAL_COMPLETED", "VISA_ISSUED", "EMIRATES_ID_APPLIED"]),
+    ("visa", r"visa|medical|emirates id|entry permit|residency|biometric|paperwork|\bpapers\b|immigration|تأشيرة|التأشيرة|فحص|الطبي|الهوية|الإقامة|إقامتي|ختم|stamping", ["VISA_APPLICATION_SUBMITTED", "MEDICAL_COMPLETED", "VISA_ISSUED", "EMIRATES_ID_APPLIED"]),
     ("permit", r"work permit|employment pass|\bpermit\b|تصريح", ["WORK_PERMIT_ISSUED"]),
     ("accommodation", r"accommodation|housing|\bflat\b|apartment|\baddress\b|hotel|where (will|do|am|shall) i (stay|staying|live|living|sleep)|(nowhere|no ?where|no place|somewhere|place) to (live|stay|sleep)|سكن|السكن", ["ACCOMMODATION_ASSIGNED", "HOUSING_ARRANGED"]),
     ("relocation", r"relocat|moving (support|package|costs?)|removal|shipment|shipping|household goods", ["RELOCATION_ASSESSED", "RELOCATION_ALLOWANCE_PAID", "HOUSING_ARRANGED"]),
@@ -513,8 +513,14 @@ def _entitlement(draft, ev, emp):
 
 def _not_applicable(draft, ev, emp, topic):
     if topic == "visa" and emp.get("visa_required") == "false":
-        draft.say("Good news: as a UAE national you don't need an employment visa, so there's **no visa medical test** for you.",
-                  "خبر سار: بصفتك مواطناً إماراتياً لا تحتاج إلى تأشيرة عمل، لذلك **لا يوجد فحص طبي للتأشيرة** بالنسبة لك.")
+        if re.search(r"residen|stamp|emirates id|الإقامة|إقامتي|ختم|الهوية", draft._msg):
+            draft.say("As a UAE national you don't need an employment visa, so there's **no residency stamping or visa-linked "
+                      "Emirates ID application** in your onboarding.",
+                      "بصفتك مواطناً إماراتياً لا تحتاج إلى تأشيرة عمل، لذلك **لا يوجد ختم إقامة أو طلب هوية مرتبط بالتأشيرة** "
+                      "ضمن إجراءات التحاقك.")
+        else:
+            draft.say("Good news: as a UAE national you don't need an employment visa, so there's **no visa medical test** for you.",
+                      "خبر سار: بصفتك مواطناً إماراتياً لا تحتاج إلى تأشيرة عمل، لذلك **لا يوجد فحص طبي للتأشيرة** بالنسبة لك.")
         draft.policy_line("POL-PRO-001 §1.2", "• ", "• ")
     elif topic in ("permit", "allowance", "accommodation") and ev["journey_type"] == "MOBILITY":
         mt = emp.get("move_type", "").replace("_", " ").lower()

@@ -644,3 +644,9 @@ def test_s13_no_visit_visa_workaround_and_travel_question_shows_blocker():
     assert "isn't part of your journey" not in r["reply"] and "work permit" in r["reply"]
     r = ask("EMP-1013", "I'm due to start in Singapore tomorrow. Am I good to go?")
     assert "**Not yet**" in r["reply"]
+
+
+def test_s14_residency_stamping_in_arabic():
+    state.reset()
+    r = ask("EMP-1014", "متى يتم ختم الإقامة الخاصة بي؟", lang="ar")
+    assert r["intent"] == "TOPIC:visa" and "POL-PRO-001 §1.2" in cites(r) and "لست متأكداً" not in r["reply"]
