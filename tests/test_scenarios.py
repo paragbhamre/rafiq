@@ -650,3 +650,19 @@ def test_s14_residency_stamping_in_arabic():
     state.reset()
     r = ask("EMP-1014", "متى يتم ختم الإقامة الخاصة بي؟", lang="ar")
     assert r["intent"] == "TOPIC:visa" and "POL-PRO-001 §1.2" in cites(r) and "لست متأكداً" not in r["reply"]
+
+
+def test_handoff_joins_open_early_warning_one_case_per_problem():
+    # DEF-014: Emeka's accommodation early warning (Omar Haddad) + his handoff = one case
+    state.reset()
+    from app.journey import seed_early_warnings
+    seed_early_warnings()
+    before = [c for c in state.cases(employee_id="EMP-1008") if c["owner"]["name"] == "Omar Haddad"]
+    assert len(before) == 1 and before[0]["type"] == "EARLY_WARNING"
+    a = {"type": "ESCALATE", "step": "ACCOMMODATION_ASSIGNED", "owner": {"name": "Omar Haddad"}}
+    p = client.post("/api/employee/EMP-1008/actions", json={"action": a, "preview": True}, headers=H("employee", "EMP-1008")).json()["preview"]
+    assert p["joins_case"] == before[0]["case_id"]
+    c = client.post("/api/employee/EMP-1008/actions", json={"action": a}, headers=H("employee", "EMP-1008")).json()["case"]
+    after = [x for x in state.cases(employee_id="EMP-1008") if x["owner"]["name"] == "Omar Haddad"]
+    assert len(after) == 1 and c["case_id"] == before[0]["case_id"] and after[0]["type"] == "EMPLOYEE_HANDOFF"
+    assert after[0]["summary"].count("SR-00004") == 1 or "SR-00004 (owner" in after[0]["summary"]

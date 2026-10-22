@@ -441,8 +441,8 @@ class PgStore(BaseStore):
         return r[0] if r else None
 
     def save_case(self, case):
-        self._x("UPDATE cases SET status=%s, doc=%s, updated_at=now() WHERE case_id=%s",
-                (case["status"], self.Jsonb(case), case["case_id"]))
+        self._x("UPDATE cases SET status=%s, case_type=%s, doc=%s, updated_at=now() WHERE case_id=%s",
+                (case["status"], case["type"], self.Jsonb(case), case["case_id"]))
 
     # consent
     def consent_set(self, employee_id, status, by):

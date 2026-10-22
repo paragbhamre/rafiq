@@ -857,6 +857,7 @@ async function confirmEscalation(a, btn) {
         ${p.policy.length ? `<p class="small muted">${ar ? "السياسات" : "Policy"}: ${p.policy.map((c) => esc(c.cite || c)).join(", ")}</p>` : ""}
         <p class="small muted">${ar ? "تحديث متوقع بحلول" : "Next update due"}: ${fmtDate(p.next_update_due)}</p>
         <p class="small muted" style="margin-top:8px">${ar ? "لن تتم مشاركة: محادثاتك مع رفيق" + (p.not_shared.length > 1 ? "، وإجاباتك على استبيان المتابعة" : "") : "Not shared: " + p.not_shared.join(", ").replace("Your check", "your check")}.</p>
+        ${p.joins_case && !p.existing_case ? `<p class="small" style="margin-top:8px">${ar ? `سيُضاف ذلك إلى الحالة المفتوحة ${esc(p.joins_case)} لدى ${esc(a.owner.name)}، فلن تُفتح حالة ثانية.` : `This will be added to case ${esc(p.joins_case)}, which ${esc(a.owner.name)} already has open, so no second case is created.`}</p>` : ""}
         ${p.existing_case ? `<p class="small" style="margin-top:8px">${ar ? `هذا الأمر لديه بالفعل (${esc(p.existing_case)}).` : `This is already with them (${esc(p.existing_case)}); nothing new will be sent.`}</p>` : ""}</div>`
     : `<div class="share-box"><strong>${t("share_what")}</strong><ul>${t("share_items").map((x) => `<li>${x}</li>`).join("")}</ul>
         <p class="small muted" style="margin-top:8px">${t("share_never")}</p></div>`;

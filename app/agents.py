@@ -70,6 +70,14 @@ def open_request(emp_id, key=None, subject=None):
     return None
 
 
+def open_early_warning_for(emp_id, owner_name):
+    """An open system early warning for this employee that is already with the same named owner."""
+    for c in reversed(state.cases(employee_id=emp_id)):
+        if c["type"] == "EARLY_WARNING" and c["status"] in OPEN and c["owner"]["name"] == owner_name:
+            return c
+    return None
+
+
 def open_handoff(emp_id, owner_name):
     """An open employee handoff to the same named owner, if any."""
     for c in reversed(state.cases(employee_id=emp_id)):
@@ -201,18 +209,38 @@ def escalate(emp_id, ev, step_code=None, include_pulse=False, employee_note="", 
                f"{ev['stage_label']}, day {ev['journey_day']}. " +
                " ".join(s["message"] + "." for s in ops[:4]))
     if linked:
-        summary += f" Linked request {linked['request_id']} ({linked['status']}, open {linked.get('days_open')} days, owner {linked['owner_name']}) {'will be raised' if preview else 'raised'} to HIGH priority."
+        verb = "will be raised" if preview else "raised"
+        if linked["request_id"] in summary:   # already described by its signal: just say what changes
+            summary += f" {linked['request_id']} (owner {linked['owner_name']}) {verb} to HIGH priority."
+        else:
+            summary += (f" Linked request {linked['request_id']} ({linked['status']}, open {linked.get('days_open')} days, "
+                        f"owner {linked['owner_name']}) {verb} to HIGH priority.")
     if employee_note:
         summary += f" Employee's note: \"{employee_note}\"."
     if pulse_lines:
         summary += " Shared with consent: " + " | ".join(pulse_lines)
+    warning = open_early_warning_for(emp_id, owner["name"])
     if preview:
         return {"owner": owner, "hrbp": emp["hrbp_name"], "title": title, "summary": summary,
                 "shared_items": shared, "policy": _cites(policy), "existing_case": existing["case_id"] if existing else None,
+                "joins_case": warning["case_id"] if warning else None,
                 "not_shared": ["Your conversations with Rafiq"] + ([] if include_pulse else ["Your check-in (pulse) answers"]),
                 "next_update_due": (config.AS_OF + dt.timedelta(days=1)).isoformat()}
-    case = _case(emp_id, "EMPLOYEE_HANDOFF", title, summary, owner, [_clean_signal(s) for s in ops],
-                 shared, policy, linked["request_id"] if linked else None, actor=actor)
+    if warning:
+        # One case per problem (DEF-014): the employee's handoff joins the early warning already with this owner
+        case = warning
+        case.update({"type": "EMPLOYEE_HANDOFF", "title": title, "summary": summary,
+                     "signals": [_clean_signal(s) for s in ops], "shared_items": shared, "policy": _cites(policy),
+                     "linked_request": linked["request_id"] if linked else case.get("linked_request"),
+                     "status": "OPEN", "joined_early_warning": True,
+                     "next_update_due": (config.AS_OF + dt.timedelta(days=1)).isoformat()})
+        case.setdefault("notes", []).append({"at": state.now_iso(), "by": f"employee:{emp_id}",
+                                             "text": "The employee asked for help through Rafiq; this early warning is now their handoff."})
+        state.save_case(case)
+        state.audit(actor, "case_joined", emp_id, f"{case['case_id']} early warning -> employee handoff ({owner['name']})")
+    else:
+        case = _case(emp_id, "EMPLOYEE_HANDOFF", title, summary, owner, [_clean_signal(s) for s in ops],
+                     shared, policy, linked["request_id"] if linked else None, actor=actor)
     state.notify(emp_id, f"Handed to {owner['name']} ({owner['role']}). Case {case['case_id']}. "
                          f"You'll hear back by {case['next_update_due']}. Your HRBP {emp['hrbp_name']} is copied.",
                  f"تم تحويل طلبك إلى {owner['name']} ({owner['role']}). رقم الحالة {case['case_id']}. "

@@ -106,7 +106,7 @@ def evaluate(emp_id, as_of=None):
             signals.append(_sig("RED", "STEP_STALLED", r, f"{r['label']} is {r['days_late']} days past its target date",
                                 f"{r['label_ar']} متأخر {r['days_late']} أيام عن الموعد المستهدف"))
         elif r["status"] == "AT_RISK":
-            signals.append(_sig("AMBER", "STEP_AT_RISK", r, f"{r['label']} is {r['days_late']} day(s) past its target date",
+            signals.append(_sig("AMBER", "STEP_AT_RISK", r, f"{r['label']} is {r['days_late']} day{'s' if r['days_late'] != 1 else ''} past its target date",
                                 f"{r['label_ar']} متأخر {r['days_late']} يوم عن الموعد المستهدف"))
 
     # 2. blocking: an at-risk/stalled step is a prerequisite of a step due within 7 days
