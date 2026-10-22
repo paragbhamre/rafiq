@@ -26,7 +26,7 @@ TOPICS = [
     ("laptop", r"laptop|computer|\bphone\b|\bkit\b|equipment|device|حاسوب|لابتوب|جهاز", ["IT_KIT_ISSUED"]),
     ("access", r"log ?in|access|account|\bemail\b|system|rostering|password|portal|can.?t get into|صلاحي|دخول", ["SYSTEM_ACCESS_GRANTED", "ACCESS_TRANSFERRED"]),
     ("allowance", r"allowance|\bpaid\b|payment|money|reimburse|بدل|مبلغ", ["RELOCATION_ALLOWANCE_PAID"]),
-    ("visa", r"visa|medical|emirates id|entry permit|residency|biometric|تأشيرة|التأشيرة|فحص|الطبي|الهوية", ["VISA_APPLICATION_SUBMITTED", "MEDICAL_COMPLETED", "VISA_ISSUED", "EMIRATES_ID_APPLIED"]),
+    ("visa", r"visa|medical|emirates id|entry permit|residency|biometric|paperwork|\bpapers\b|immigration|تأشيرة|التأشيرة|فحص|الطبي|الهوية", ["VISA_APPLICATION_SUBMITTED", "MEDICAL_COMPLETED", "VISA_ISSUED", "EMIRATES_ID_APPLIED"]),
     ("permit", r"work permit|employment pass|\bpermit\b|تصريح", ["WORK_PERMIT_ISSUED"]),
     ("accommodation", r"accommodation|housing|\bflat\b|apartment|\baddress\b|hotel|where (will|do|am|shall) i (stay|staying|live|living|sleep)|(nowhere|no ?where|no place|somewhere|place) to (live|stay|sleep)|سكن|السكن", ["ACCOMMODATION_ASSIGNED", "HOUSING_ARRANGED"]),
     ("relocation", r"relocat|moving (support|package|costs?)|removal|shipment|shipping|household goods", ["RELOCATION_ASSESSED", "RELOCATION_ALLOWANCE_PAID", "HOUSING_ARRANGED"]),
@@ -316,6 +316,31 @@ def _blocking_roots(ev, step):
     return out
 
 
+SELF_TRAVEL_RE = (r"book (my|a) (own )?(flight|ticket)|buy (my|a) (own )?(flight|ticket)|book (it )?myself|"
+                  r"(fly|travel|come|go) (anyway|without|first|on a visit)|visit visa|tourist visa|"
+                  r"sort (the|my|out the|out my) (visa|paperwork)? ?(out )?(when|after) i (land|arrive|get there)")
+
+
+def _self_travel_answer(draft, ev, emp):
+    """'Should I just book my own flight?' while the permit isn't issued -> a direct no, with the reasons."""
+    steps = {s["code"]: s for s in ev["steps"]}
+    permit = steps.get("VISA_ISSUED") or steps.get("WORK_PERMIT_ISSUED")
+    if not permit or permit["status"] in ("DONE", "DONE_LATE"):
+        return False
+    draft.say("**Please don't book or travel yet.** You need a valid entry permit before you travel, and the company "
+              "books your joining ticket once it's issued, so there's nothing for you to pay or rebook.",
+              "**يرجى عدم الحجز أو السفر الآن.** تحتاج إلى تصريح دخول ساري قبل السفر، وتحجز الشركة تذكرة التحاقك "
+              "بعد صدوره، لذلك لا يلزمك دفع أو إعادة حجز أي شيء.")
+    for c in ("POL-PRO-001 §6.3", "POL-TRV-001 §1.3", "POL-TRV-001 §4.1"):
+        draft.policy_line(c, "• ", "• ")
+    draft.say(f"If your joining date needs to move, your HR Business Partner ({emp['hrbp_name']}) agrees it with you "
+              "and your hiring manager. Here's where your visa stands:",
+              f"إذا احتاج تاريخ التحاقك إلى تغيير، يتفق عليه معك شريك الموارد البشرية ({emp['hrbp_name']}) ومديرك. "
+              "هذا وضع تأشيرتك:")
+    draft._self_travel = True
+    return True
+
+
 def compose_topic(draft, ev, emp, topic, codes):
     steps = {s["code"]: s for s in ev["steps"]}
     candidates = [steps[c] for c in codes if c in steps]
@@ -333,6 +358,8 @@ def compose_topic(draft, ev, emp, topic, codes):
         if topic == "accommodation" or "RELOCATION_ALLOWANCE_PAID" not in steps or re.search(r"transport|settling|housing|سكن|مواصلات", draft._msg):
             return
         focus = [steps["RELOCATION_ALLOWANCE_PAID"]]
+    if topic in ("visa", "ticket", "permit") and re.search(SELF_TRAVEL_RE, draft._msg):
+        _self_travel_answer(draft, ev, emp)
     if topic == "lost":
         draft.say("I'm sorry it's felt like that — let's sort out who you can turn to right now.",
                   "يؤسفني أنك شعرت بذلك — دعنا نحدد الآن من يمكنك اللجوء إليه.")
@@ -358,14 +385,23 @@ def compose_topic(draft, ev, emp, topic, codes):
             draft.steps.append(s["code"])
             _step_policy(draft, s, max_lines=1)
             _offer_step_actions(draft, ev, s, emp)
+    focus_codes = {x["code"] for x in focus}
     for s in ([] if roots else focus):
         draft.steps.append(s["code"])
+        behind = [w for w in s.get("waiting_on", []) if w in focus_codes]
+        if behind:  # e.g. visa issued waits on the medical just described: say so briefly, don't repeat the chain
+            _describe_step(draft, ev, s, emp, detail=False)
+            draft.say("It can only follow once the step above is done.", "لا يمكن إتمامها إلا بعد الخطوة أعلاه.")
+            _step_policy(draft, s, max_lines=1)
+            continue
         _describe_step(draft, ev, s, emp)
         _step_policy(draft, s)
         _offer_step_actions(draft, ev, s, emp)
     if topic == "lost":
         draft.say(f"Your HR Business Partner is **{emp['hrbp_name']}** and your manager is **{emp['manager_name']}**.",
                   f"شريك الموارد البشرية الخاص بك هو **{emp['hrbp_name']}** ومديرك هو **{emp['manager_name']}**.")
+    if getattr(draft, "_self_travel", False):
+        _hrbp_action(draft, emp, False)   # after the PRO escalation, which stays the main action
     _maybe_compound(draft, ev, emp)
     if not problem:
         _next_steps(draft, ev, limit=2)

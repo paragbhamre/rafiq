@@ -493,3 +493,20 @@ def test_s01_paraphrase_leads_with_the_laptop_root_cause():
     assert any(a.get("request_key") == "IT_LOAN_DEVICE" for a in r["actions"])
     assert "Priya Raman" in {a["owner"]["name"] for a in primary_escalation(r)}
     assert {"POL-IT-001 §5.1", "POL-LRN-001 §5.1"} <= cites(r)
+
+
+def test_s02_self_booking_gets_a_direct_no():
+    # SCN-S02-02: "should I just book my own flight?" while the visa isn't issued
+    state.reset()
+    r = ask("EMP-1002", "Should I just book my own flight and sort the visa out when I land?")
+    assert r["reply"].startswith("**Please don't book or travel yet.**")
+    assert {"POL-PRO-001 §6.3", "POL-TRV-001 §1.3", "POL-TRV-001 §4.1"} <= cites(r)
+    esc = [a for a in r["actions"] if a["type"] == "ESCALATE"]
+    assert esc[0]["owner"]["name"] == "Khalid Al Mansoori" and "Abdulla Al Kaabi" in {a["owner"]["name"] for a in esc}
+
+
+def test_s02_paraphrase_paperwork_is_the_visa():
+    # SCN-S02-03
+    r = ask("EMP-1002", "My family and I are supposed to arrive soon. What's holding up the paperwork?")
+    assert "Visa medical fitness test completed" in r["reply"] and "can't match" not in r["reply"]
+    assert "Khalid Al Mansoori" in {a["owner"]["name"] for a in primary_escalation(r)}
