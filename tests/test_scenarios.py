@@ -598,3 +598,20 @@ def test_s06_my_data_says_withdrawn_not_just_not_opted_in():
     assert d["consent"]["state"] == "WITHDRAWN"
     assert all(p["used_by_companion"] is False for p in d["pulse"]) and not d["shared_with_others"]
     assert client.get("/api/employee/EMP-1009/mydata", headers=H("employee", "EMP-1009")).json()["consent"]["state"] in ("ACTIVE", "NOT_OPTED_IN")
+
+
+def test_s09_no_false_alarms_and_clear_no():
+    # SCN-S09-01 / S09-03
+    state.reset()
+    r = ask("EMP-1009", "Am I behind on anything?")
+    assert r["intent"] == "STATUS" and "not behind" in r["reply"] and not r["actions"]
+    r = ask("EMP-1009", "What's next for me?")
+    assert "POL-LRN-001 §2.2" in cites(r) and "mandatory training" in r["reply"] and not r["actions"]
+    for word in ("late", "stalled", "escalat"):
+        assert word not in r["reply"].lower(), word
+
+
+def test_status_leads_with_the_root_cause():
+    # DEF-008 in chat: Aisha's status answer leads with the laptop, not network access
+    r = ask("EMP-1001", "Am I behind on anything?")
+    assert r["reply"].index("Laptop and phone issued") < r["reply"].index("Network, email")

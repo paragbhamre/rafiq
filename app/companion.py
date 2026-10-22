@@ -39,7 +39,7 @@ TOPICS = [
     ("move", r"\bmove\b|transfer|new role|endorse|release date|handover|انتقال|الانتقال", ["RECEIVING_MANAGER_ENDORSED", "RELEASING_MANAGER_RELEASED", "TRANSFER_APPROVED", "TRANSFER_LETTER_ISSUED", "HANDOVER_COMPLETED", "MOVE_EFFECTIVE"]),
     ("objectives", r"objective|probation goal|أهداف", ["PROBATION_OBJECTIVES_SET"]),
 ]
-STATUS_RE = r"what.?s next|next step|how am i doing|on track|status|what.?s happening|where am i|good to go|all set|am i ready|progress|update|can i (fly|travel|start|go)|ماذا بعد|الخطوة التالية|خطواتي|التالية|وضعي|رحلتي|جاهز"
+STATUS_RE = r"what.?s next|next step|how am i doing|on track|status|am i (behind|late|missing|overdue)|(is|are) (anything|something|there anything) (late|overdue|outstanding|missing|behind)|anything (i.?m|i am) (behind|missing)|do i need to do anything|(is|are) there anything (i need|to do|pending|outstanding)|anything pending|أنا متأخر|هل هناك شيء متأخر|what.?s happening|where am i|good to go|all set|am i ready|progress|update|can i (fly|travel|start|go)|ماذا بعد|الخطوة التالية|خطواتي|التالية|وضعي|رحلتي|جاهز"
 PRIVACY_RE = (r"manager (see|know|read)|who can see|my data|privacy|confidential|affect my (probation|performance|review)|"
               r"used against|performance (review|decision)|will (it|this) affect|يرى مديري|خصوصي|بياناتي|التجربة")
 HUMAN_RE = r"talk to (a |an )?(human|person|someone|real)|speak (to|with) (hr|someone|a person)|escalate|contact my hrbp|أريد التحدث"
@@ -557,8 +557,13 @@ def compose_status(draft, ev, emp, greeting=False):
             draft.say("**Not yet** — something needs to be resolved first:", "**ليس بعد** — هناك أمر يجب حله أولاً:")
         else:
             draft.say("Not everything is on track:", "ليست كل الأمور تسير وفق الخطة:")
-        ordered = sorted(problems, key=lambda s: (0 if any(b["step"] == s["code"] for b in blocking) else 1,
-                                                  STATUS_ORDER[s["status"]]))
+        # root causes first: a step that is only late because another late step is stuck (access waits on the
+        # laptop) is covered by that step's "also holding up" line, not shown as a separate problem (DEF-008)
+        codes = {p["code"] for p in problems}
+        roots = [p for p in problems if not (set(p.get("waiting_on", [])) & codes)] or problems
+        ordered = sorted(roots, key=lambda s: (0 if any(b["step"] == s["code"] for b in blocking) else 1,
+                                               STATUS_ORDER[s["status"]], s["target_day"]))
+        problems = roots
         for s in ordered[:2]:
             draft.steps.append(s["code"])
             _describe_step(draft, ev, s, emp)
@@ -571,9 +576,20 @@ def compose_status(draft, ev, emp, greeting=False):
     else:
         if asked_ready:
             draft.say("**Yes — everything due so far is done.**", "**نعم — كل ما هو مستحق حتى الآن قد اكتمل.**")
+        elif re.search(r"behind|late|missing|overdue|متأخر", draft._msg):
+            draft.say("**No, you're not behind on anything.** Everything due so far is done.",
+                      "**لا، لست متأخراً في أي شيء.** كل ما هو مستحق حتى الآن قد اكتمل.")
         else:
             draft.say("Everything due so far is on track. 👍", "كل ما هو مستحق حتى الآن يسير وفق الخطة. 👍")
     _next_steps(draft, ev, limit=3)
+    # Booked mandatory training still has to be completed by Day 30 (not a journey step of its own)
+    st = {x["code"]: x for x in ev["steps"]}
+    tr = st.get("MANDATORY_TRAINING_BOOKED")
+    if ev["journey_type"] == "ONBOARDING" and tr and tr["status"] in ("DONE", "DONE_LATE") and 0 <= ev["journey_day"] <= 30:
+        due = _fmt_date((dt.date.fromisoformat(ev["anchor_date"]) + dt.timedelta(days=30)).isoformat(), draft.lang == "ar")
+        draft.say(f"📅 **Complete your booked mandatory training** by {due} (Day 30).",
+                  f"📅 **أكمل التدريب الإلزامي المحجوز** بحلول {due} (اليوم 30).")
+        draft.policy_line("POL-LRN-001 §2.2", "• ", "• ")
 
 
 def compose_privacy(draft, ev, emp):
