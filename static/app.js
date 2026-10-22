@@ -699,7 +699,7 @@ function stepRow(s, help = false) {
   return `<li class="${s.status}"><span class="sno">${n}</span><div><div class="s-label">${lbl}</div><div class="s-sub">${sub}</div></div><span class="tag ${s.status}">${t("status")[s.status]}${["STALLED", "AT_RISK"].includes(s.status) ? ` +${s.days_late}d` : ""}</span>${help ? (ATTN.includes(s.status) ? `<button class="btn btn-s" data-ask="${lbl}">${ar ? "اطلب المساعدة" : "Get help"}</button>` : "<span></span>") : ""}</li>`;
 }
 
-function addMe(text) { const d = document.createElement("div"); d.className = "msg me"; d.textContent = text; $("#msgs").appendChild(d); scrollMsgs(); }
+function addMe(text) { const d = document.createElement("div"); d.className = "msg me"; d.dir = "auto"; d.textContent = text; $("#msgs").appendChild(d); scrollMsgs(); }
 function scrollMsgs() { const m = $("#msgs"); m.scrollTop = m.scrollHeight; }
 function addBot(r, scroll = true) {
   const d = document.createElement("div"); d.className = "msg bot" + (r.stream ? " streaming" : "");
@@ -707,7 +707,7 @@ function addBot(r, scroll = true) {
   d.innerHTML = `<span class="bot-av" aria-hidden="true">R</span><div class="bot-main"><div class="body" dir="${r.lang === "ar" ? "rtl" : "ltr"}">${md(r.reply)}</div>
     ${r.actions.length ? `<div class="acts">${r.actions.map((a, i) => `<button class="btn ${a.primary ? "primary" : ""}" data-i="${i}">${esc(a.label)}</button>`).join("")}</div>` : ""}
     ${extra.length ? `<div class="meta">${t("sources")}: ${extra.map((c) => `<button class="cite" data-cite="${c.cite}">${c.cite}</button>`).join("")}</div>` : ""}
-    ${r.mode && r.mode !== "offline" && r.intent !== "BRIEF" ? `<div class="meta">${r.mode === "offline_fallback" ? (S.lang === "ar" ? "إجابة قياسية من الحقائق المؤكدة" : "Standard answer from verified facts") : (S.lang === "ar" ? "صاغها الذكاء الاصطناعي من الحقائق والمصادر المؤكدة فقط" : "Worded by AI from verified facts and the sources shown only")}</div>` : ""}</div>`;
+    ${r.mode && r.mode !== "offline" && r.intent !== "BRIEF" ? `<div class="meta">${r.mode === "offline_fallback" ? (r.lang === "ar" ? "إجابة قياسية من الحقائق المؤكدة" : "Standard answer from verified facts") : (r.lang === "ar" ? "صاغها الذكاء الاصطناعي من الحقائق والمصادر المؤكدة فقط" : "Worded by AI from verified facts and the sources shown only")}</div>` : ""}</div>`;
   d.querySelectorAll(".acts .btn").forEach((b) => {
     const a = r.actions[+b.dataset.i]; b._action = a;
     const done = actionDone(a);

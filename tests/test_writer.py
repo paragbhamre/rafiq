@@ -34,3 +34,9 @@ def test_slow_writer_falls_back_to_the_grounded_draft_within_the_deadline(monkey
     r = companion.chat("EMP-1001", "It's my first week and I still don't have a laptop. What do I do?")
     assert time.time() - t0 < 3
     assert r["mode"] == "offline_fallback" and "Laptop and phone issued" in r["reply"]
+
+
+def test_writer_output_has_no_emoji():
+    from app.llm import _formal
+    assert _formal("Hi Shamma \U0001F60A\n\nYour allowance is AED 9,000.") == "Hi Shamma\n\nYour allowance is AED 9,000."
+    assert _formal("مرحباً شمّة 😊") == "مرحباً شمّة"

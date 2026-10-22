@@ -25,7 +25,7 @@ class Truncated(Exception):
     """The provider stopped at its output limit; a partial reply is never shown."""
 
 SYSTEM = """You are Rafiq, a secure employee journey companion. You work FOR the employee, never as a monitoring tool.
-Rewrite the DRAFT into a clear, warm, concise reply for the employee (max ~170 words, short paragraphs or bullets).
+Rewrite the DRAFT into a clear, courteous, concise reply for the employee (max ~170 words, short paragraphs or bullets).
 Strict rules:
 - Use ONLY facts in DRAFT, JOURNEY and ALLOWED_POLICY_SECTIONS. Never invent dates, amounts, names, policies or outcomes.
 - Every policy statement must carry its citation in square brackets exactly as given, e.g. [POL-IT-001 §5.1]. Only cite IDs from ALLOWED_POLICY_SECTIONS.
@@ -33,6 +33,8 @@ Strict rules:
 - Do not promise outcomes. Do not say an action is done unless the draft says so; the employee confirms actions with the buttons shown under your reply.
 - Do not list or repeat the options in BUTTONS SHOWN UNDER YOUR REPLY; the employee already sees them. At most say "use the buttons below".
 - Never mention other employees, never reveal sentiment scores to anyone else, never suggest use in performance decisions.
+- Tone: formal and professional, as in an official Emirates HR service; polite and empathetic without being casual.
+  No emoji, no exclamation marks, no slang. Open with "Dear {{first name}}," or go straight to the answer.
 - Reply in {lang_name}. Keep names, request IDs and citations unchanged."""
 
 
@@ -57,9 +59,17 @@ def _context(emp_id, draft, ev):
 _POOL = concurrent.futures.ThreadPoolExecutor(max_workers=8, thread_name_prefix="writer")
 
 
+_EMOJI = re.compile("[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F000-\U0001F2FF\uFE0F]")
+
+
+def _formal(text):
+    """Backstop for the tone rule: strip emoji the writer may still add."""
+    return re.sub(r"[ \t]{2,}", " ", _EMOJI.sub("", text)).replace(" \n", "\n").strip()
+
+
 def rewrite(emp_id, msg, draft, ev, history=None):
     allowed, sections, journey, actions = _context(emp_id, draft, ev)
-    lang_name = "Arabic (Modern Standard, friendly)" if draft.lang == "ar" else "English (UK)"
+    lang_name = "Arabic (Modern Standard, formal)" if draft.lang == "ar" else "English (UK)"
     user = (f"EMPLOYEE MESSAGE:\n{msg}\n\nDRAFT (grounded, authoritative):\n" + "\n".join(draft.lines) +
             f"\n\nNOT_SURE: {draft.unsure}\nBUTTONS SHOWN UNDER YOUR REPLY: {json.dumps(actions, ensure_ascii=False)}"
             f"\n\nJOURNEY: {json.dumps(journey, ensure_ascii=False)}"
@@ -84,7 +94,8 @@ def rewrite(emp_id, msg, draft, ev, history=None):
         return None
     if not text:
         return None
-    return validate(text, allowed, draft)
+    out = validate(text, allowed, draft)
+    return _formal(out) if out else out
 
 
 _WORD = re.compile(r"\w+", re.U)
