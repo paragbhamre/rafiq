@@ -248,9 +248,20 @@ def _describe_step(draft, ev, step, emp, detail=True):
         if s["type"] == "BLOCKING" and s["step"] == step["code"]:
             draft.say(f"⚠️ {s['message_ar'] if ar else s['message']}.")
     if step["status"] in ("STALLED", "AT_RISK"):
-        held = [x for x in ev["steps"] if step["code"] in x["waiting_on"] and x["status"] not in ("DONE", "DONE_LATE")]
+        # everything downstream (laptop -> access -> induction), nearest first, flagging what is due today
+        held, frontier = [], {step["code"]}
+        while frontier:
+            nxt = [x for x in ev["steps"] if set(x["waiting_on"]) & frontier and x["status"] not in ("DONE", "DONE_LATE")
+                   and x not in held]
+            held += nxt
+            frontier = {x["code"] for x in nxt}
         if held:
-            names = ", ".join(x["label_ar" if ar else "label"].lower() if not ar else x["label_ar"] for x in held[:3])
+            def name(x):
+                n = x["label_ar"] if ar else x["label"].lower()
+                if x["status"] == "DUE_TODAY":
+                    n += " (مستحق اليوم)" if ar else " (due today)"
+                return n
+            names = ", ".join(name(x) for x in held[:3])
             draft.say(f"This is also holding up: {names}.", f"هذا يؤخر أيضاً: {names}.")
 
 

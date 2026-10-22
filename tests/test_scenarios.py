@@ -58,6 +58,7 @@ def test_s01_day5_no_laptop():
     assert any(a.get("request_key") == "IT_LOAN_DEVICE" for a in r["actions"])
     assert "Priya Raman" in {a["owner"]["name"] for a in primary_escalation(r)}
     assert "SR-00001" in r["reply"]
+    assert "corporate induction attended (due today)" in r["reply"]  # full chain: kit -> access -> induction
 
 
 def test_s02_visa_stalled_before_joining():
