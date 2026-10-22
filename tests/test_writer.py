@@ -40,3 +40,16 @@ def test_writer_output_has_no_emoji():
     from app.llm import _formal
     assert _formal("Hi Shamma \U0001F60A\n\nYour allowance is AED 9,000.") == "Hi Shamma\n\nYour allowance is AED 9,000."
     assert _formal("مرحباً شمّة 😊") == "مرحباً شمّة"
+
+
+def test_writer_is_told_when_a_handoff_already_exists():
+    # S08-03: after escalating, the writer must not invite the employee to escalate again
+    from app import agents, companion, llm
+    from app.data import state
+    from app.journey import evaluate
+    state.reset()
+    agents.escalate("EMP-1008", evaluate("EMP-1008"), "ACCOMMODATION_ASSIGNED")
+    d, ev = companion.route("EMP-1008", "Where am I staying when I arrive on Friday?")
+    _, _, journey, buttons = llm._context("EMP-1008", d, ev)
+    assert any("Already handed to Omar Haddad" in x for x in journey["already_done"])
+    assert not any("Omar Haddad" in b for b in buttons)

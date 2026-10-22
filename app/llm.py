@@ -32,6 +32,8 @@ Strict rules:
 - If the draft says you are not sure, say plainly that you are not sure and offer the handoff. Do not answer from general knowledge.
 - Do not promise outcomes. Do not say an action is done unless the draft says so; the employee confirms actions with the buttons shown under your reply.
 - Do not list or repeat the options in BUTTONS SHOWN UNDER YOUR REPLY; the employee already sees them. At most say "use the buttons below".
+- If JOURNEY.already_done lists a handoff or request, say it is already with that person (with the case number and next update)
+  and do NOT invite the employee to escalate or request it again. If there are no buttons left, don't mention buttons.
 - Never mention other employees, never reveal sentiment scores to anyone else, never suggest use in performance decisions.
 - Tone: formal and professional, as in an official Emirates HR service; polite and empathetic without being casual.
   No emoji, no exclamation marks, no slang. Open with "Dear {{first name}}," or go straight to the answer.
@@ -52,7 +54,18 @@ def _context(emp_id, draft, ev):
     }
     if usable_pulse(emp_id):  # opt-in only
         journey["employee_checkins"] = [{"date": p["submitted_at"][:10], "score": p["score"]} for p in usable_pulse(emp_id)][-2:]
-    actions = [a["label"] for a in draft.actions]
+    from .agents import open_handoff, open_request
+    actions, done = [], []
+    for a in draft.actions:
+        c = open_handoff(emp_id, a["owner"]["name"]) if a["type"] == "ESCALATE" and a.get("owner") else None
+        r = open_request(emp_id, a.get("request_key")) if a["type"] == "RAISE_REQUEST" else None
+        if c:
+            done.append(f"Already handed to {a['owner']['name']} (case {c['case_id']}, next update {c['next_update_due']})")
+        elif r:
+            done.append(f"Already requested: {a['label']} ({r['request_id']})")
+        else:
+            actions.append(a["label"])
+    journey["already_done"] = done
     return allowed, sections, journey, actions
 
 
