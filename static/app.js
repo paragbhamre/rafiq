@@ -354,7 +354,8 @@ async function renderEmployeeHome() {
   S.journey = j;
   const label = (s) => esc(ar ? s.label_ar : s.label);
   const attn = j.steps.filter((s) => ATTN.includes(s.status));
-  const stalled = attn.filter((s) => s.status === "STALLED").length;
+  const stalled = attn.filter((s) => s.status === "STALLED" && !s.blocked_by).length;
+  const waitingOnRoot = attn.filter((s) => s.blocked_by).length;
   const next = j.steps.filter((s) => ["UPCOMING", "WAITING"].includes(s.status)).sort((a, b) => a.target_date.localeCompare(b.target_date));
   const openReq = j.requests.filter(isOpenReq); const overSla = openReq.filter((q) => q.sla_state !== "OK").length;
   const pct = Math.round((j.progress.done / j.progress.total) * 100);
@@ -370,15 +371,15 @@ async function renderEmployeeHome() {
   ${S.homeStyle ? homeRoute(j) : routeCard(j, L("Welcome back", "أهلاً بعودتك"))}
   <div class="kpis">
     ${timeKpi(j)}
-    ${kpi(L("Needs attention", "يحتاج متابعة"), attn.length, attn.length ? (stalled ? L(`${stalled} stalled`, `${stalled} متوقفة`) : L("due or late", "مستحقة أو متأخرة")) : L("Nothing late", "لا شيء متأخر"), attn.length ? (stalled ? "red" : "amber") : "green")}
+    ${kpi(L("Needs attention", "يحتاج متابعة"), attn.length, attn.length ? (stalled ? L(`${stalled} stalled` + (waitingOnRoot ? `, ${waitingOnRoot} waiting on it` : ""), `${stalled} متوقفة` + (waitingOnRoot ? `، و${waitingOnRoot} بانتظارها` : "")) : L("due or late", "مستحقة أو متأخرة")) : L("Nothing late", "لا شيء متأخر"), attn.length ? (stalled ? "red" : "amber") : "green")}
     ${kpi(L("Open requests", "طلبات مفتوحة"), openReq.length, overSla ? L(`${overSla} over service level`, `${overSla} تجاوزت مستوى الخدمة`) : L("All within service level", "كلها ضمن مستوى الخدمة"), overSla ? "red" : "")}
     ${kpi(L("Next milestone", "المحطة التالية"), next[0] ? fmtDate(next[0].target_date) : "—", next[0] ? label(next[0]) : L("All steps complete", "اكتملت كل الخطوات"))}
   </div>
   <div class="dash-grid">
     <section class="panel"><div class="panel-h"><h2>${L("Needs your attention", "يحتاج انتباهك")}</h2></div><div class="panel-b">
-      ${attn.length ? `<ul class="att">${attn.map((s) => `<li><span class="tag ${s.status}">${t("status")[s.status]}${s.days_late ? ` +${s.days_late}d` : ""}</span>
+      ${attn.length ? `<ul class="att">${[...attn].sort((a, b) => (a.blocked_by ? 1 : 0) - (b.blocked_by ? 1 : 0)).map((s) => `<li>${s.blocked_by ? waitTag(s) : `<span class="tag ${s.status}">${t("status")[s.status]}${s.days_late ? ` +${s.days_late}d` : ""}</span>`}
         <div class="att-t"><strong><span class="sno-in">${L("Step", "الخطوة")} ${s.n}</span>${label(s)}</strong><span class="small muted">${t("due")} ${fmtDate(s.target_date)} · ${esc(s.owner_team)}</span></div>
-        <button class="btn" data-ask="${label(s)}">${L("Get help", "اطلب المساعدة")}</button></li>`).join("")}</ul>`
+        ${s.blocked_by ? "<span></span>" : `<button class="btn" data-ask="${label(s)}">${L("Get help", "اطلب المساعدة")}</button>`}</li>`).join("")}</ul>`
         : `<p class="empty-ok">${L("You're on track. Nothing needs you right now.", "رحلتك تسير وفق الخطة. لا شيء يحتاجك الآن.")}</p>`}
     </div></section>
     <section class="panel"><div class="panel-h"><h2>${L("Coming up", "القادم")}</h2><button class="linkbtn" data-go="journey">${L("All steps", "كل الخطوات")}</button></div><div class="panel-b">
@@ -582,7 +583,7 @@ function drawSnake(j, opt = {}) {
         <span class="sn-node">${isDone(s) ? "✓" : s.n}</span>
         <span class="sn-n">${L("Step", "الخطوة")} ${s.n}</span>
         <span class="sn-l">${lbl}</span>
-        <span class="sn-d">${sub}${["STALLED", "AT_RISK"].includes(s.status) ? ` · <b>${t("status")[s.status]} +${s.days_late}d</b>` : s.status === "DUE_TODAY" ? ` · <b>${t("status").DUE_TODAY}</b>` : ""}</span>
+        <span class="sn-d">${sub}${s.blocked_by ? ` · ${L("waiting on", "بانتظار")} ${esc(ar ? s.blocked_by.label_ar : s.blocked_by.label)}` : ["STALLED", "AT_RISK"].includes(s.status) ? ` · <b>${t("status")[s.status]} +${s.days_late}d</b>` : s.status === "DUE_TODAY" ? ` · <b>${t("status").DUE_TODAY}</b>` : ""}</span>
       </button>`;
     }).join("")}</div>`;
   }).join("");
@@ -693,12 +694,17 @@ function ribbon(j) {
   </div>`;
 }
 
+// A late step that only waits on another late step shows "Waiting on <root>" instead of its own stall (DEF-008)
+function waitTag(s) {
+  const ar = S.lang === "ar"; const b = s.blocked_by;
+  return `<span class="tag WAITING">${ar ? "بانتظار" : "Waiting on"} ${esc(ar ? b.label_ar : b.label)}</span>`;
+}
 function stepRow(s, help = false) {
   const ar = S.lang === "ar";
   const sub = s.completed_at ? fmtDate(s.completed_at) : `${t("due")} ${fmtDate(s.target_date)} · ${esc(s.owner_team)}`;
   const lbl = esc(ar ? s.label_ar : s.label);
   const n = s.n || (S.journey?.no || {})[s.code] || "";
-  return `<li class="${s.status}"><span class="sno">${n}</span><div><div class="s-label">${lbl}</div><div class="s-sub">${sub}</div></div><span class="tag ${s.status}">${t("status")[s.status]}${["STALLED", "AT_RISK"].includes(s.status) ? ` +${s.days_late}d` : ""}</span>${help ? (ATTN.includes(s.status) ? `<button class="btn btn-s" data-ask="${lbl}">${ar ? "اطلب المساعدة" : "Get help"}</button>` : "<span></span>") : ""}</li>`;
+  return `<li class="${s.status}"><span class="sno">${n}</span><div><div class="s-label">${lbl}</div><div class="s-sub">${sub}</div></div>${s.blocked_by ? waitTag(s) : `<span class="tag ${s.status}">${t("status")[s.status]}${["STALLED", "AT_RISK"].includes(s.status) ? ` +${s.days_late}d` : ""}</span>`}${help ? (ATTN.includes(s.status) && !s.blocked_by ? `<button class="btn btn-s" data-ask="${lbl}">${ar ? "اطلب المساعدة" : "Get help"}</button>` : "<span></span>") : ""}</li>`;
 }
 
 function addMe(text) { const d = document.createElement("div"); d.className = "msg me"; d.dir = "auto"; d.textContent = text; $("#msgs").appendChild(d); scrollMsgs(); }

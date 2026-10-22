@@ -666,3 +666,14 @@ def test_handoff_joins_open_early_warning_one_case_per_problem():
     after = [x for x in state.cases(employee_id="EMP-1008") if x["owner"]["name"] == "Omar Haddad"]
     assert len(after) == 1 and c["case_id"] == before[0]["case_id"] and after[0]["type"] == "EMPLOYEE_HANDOFF"
     assert after[0]["summary"].count("SR-00004") == 1 or "SR-00004 (owner" in after[0]["summary"]
+
+
+def test_dependent_late_steps_name_their_root_cause():
+    # DEF-008: Aisha's access and induction wait on the laptop; Lucas's visa application waits on the background check
+    from app.journey import evaluate
+    st = {s["code"]: s for s in evaluate("EMP-1001")["steps"]}
+    assert "blocked_by" not in st["IT_KIT_ISSUED"]
+    assert st["SYSTEM_ACCESS_GRANTED"]["blocked_by"]["code"] == "IT_KIT_ISSUED"
+    assert st["INDUCTION_COMPLETED"]["blocked_by"]["code"] == "IT_KIT_ISSUED"
+    st = {s["code"]: s for s in evaluate("EMP-1301")["steps"]}
+    assert st["VISA_APPLICATION_SUBMITTED"]["blocked_by"]["code"] == "BACKGROUND_CHECK_CLEARED"

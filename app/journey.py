@@ -98,6 +98,25 @@ def evaluate(emp_id, as_of=None):
 
     steps.sort(key=lambda r: r["target_day"])
     by_code = {r["code"]: r for r in steps}
+    # A late step that is only late because an earlier late step is stuck (access waits on the laptop):
+    # name the root cause so screens show one problem and one owner (DEF-008)
+    late = ("STALLED", "AT_RISK")
+    for r in steps:
+        if r["status"] in late or r["status"] == "DUE_TODAY":
+            root, seen = None, set()
+            todo = [w for w in r["waiting_on"] if by_code.get(w, {}).get("status") in late]
+            while todo:
+                c = todo.pop(0)
+                if c in seen:
+                    continue
+                seen.add(c)
+                deeper = [w for w in by_code[c]["waiting_on"] if by_code.get(w, {}).get("status") in late]
+                if deeper:
+                    todo += deeper
+                else:
+                    root = root or by_code[c]
+            if root:
+                r["blocked_by"] = {"code": root["code"], "label": root["label"], "label_ar": root["label_ar"]}
     signals = []
 
     # 1. step at risk / stalled
