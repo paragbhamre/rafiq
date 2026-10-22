@@ -750,6 +750,7 @@ async function send() {
   const inp = $("#input"); const text = inp.value.trim(); if (!text) return;
   finishTyping();
   inp.value = ""; inp.style.height = "auto"; addMe(text); $("#typing").classList.remove("hidden");
+  requestAnimationFrame(scrollMsgs);  // the "checking your journey" line shrinks the chat area; keep the new message in view
   $("#suggest")?.classList.add("hidden");  // suggestions help you start; once you're talking they step aside
   try {
     const r = await api(`/api/employee/${S.user}/chat`, { method: "POST", body: JSON.stringify({ message: text, lang: S.lang, thread_id: S.threadId || null }) });
@@ -761,7 +762,7 @@ async function send() {
     S.threadId = r.thread_id;
   }
   catch (e) { addBot({ reply: e.message, citations: [], actions: [], lang: S.lang }); }
-  finally { $("#typing").classList.add("hidden"); }
+  finally { $("#typing").classList.add("hidden"); requestAnimationFrame(scrollMsgs); }
 }
 
 async function doAction(a, btn) {
