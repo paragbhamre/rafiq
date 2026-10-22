@@ -134,6 +134,9 @@ def rewrite(emp_id, msg, draft, ev, history=None):
     if out and ongoing:
         out = re.sub(r"^\s*(dear|hi|hello)\b[^\n,]{0,40},?\s*\n+|^\s*(عزيزي|عزيزتي|مرحباً|مرحبا)[^\n،,]{0,40}[،,]?\s*\n+", "",
                      out, count=1, flags=re.I)
+    if out and len(actions) == 1:   # only one button left: say "button", not "buttons"
+        out = re.sub(r"\bthe buttons below\b", "the button below", out)
+        out = re.sub(r"\bwhichever step you prefer\b", "proceed", out)
     return _formal(out) if out else out
 
 
