@@ -6,7 +6,7 @@ services:
   - type: web
     name: rafiq-journey-companion
     runtime: docker
-    plan: free            # switch to "starter" during judging so the app never sleeps
+    plan: starter         # always on for judging (free sleeps after 15 idle minutes); back to "free" afterwards
     region: frankfurt     # closest Render region to the UAE
     healthCheckPath: /api/health
     autoDeploy: true
