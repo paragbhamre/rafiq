@@ -42,6 +42,30 @@ class BaseStore:
     def audit(self, actor, action, employee_id, detail):
         self._audit({"at": self.now_iso(), "actor": actor, "action": action, "employee_id": employee_id, "detail": detail})
 
+    # Completions recorded by a named owner when they resolve a case (WFL-CS-04). Stored as flags so both
+    # stores need no new table: "done|EMP|STEP|date" and "reqdone|SR-ID|date". Cached briefly; reset clears them.
+    _comp = None
+
+    def add_completion(self, employee_id, step_code, date, request_id=None):
+        self.flag_set(f"done|{employee_id}|{step_code}|{date}")
+        if request_id:
+            self.flag_set(f"reqdone|{request_id}|{date}")
+        self._comp = None
+
+    def completions(self):
+        import time
+        if self._comp and time.time() - self._comp[0] < 3:
+            return self._comp[1]
+        steps, reqs = {}, {}
+        for k in self._flag_keys():
+            parts = k.split("|")
+            if parts[0] == "done" and len(parts) == 4:
+                steps[(parts[1], parts[2])] = parts[3]
+            elif parts[0] == "reqdone" and len(parts) == 3:
+                reqs[parts[1]] = parts[2]
+        self._comp = (time.time(), {"steps": steps, "requests": reqs})
+        return self._comp[1]
+
     def notify(self, employee_id, text, text_ar=None, kind="info", ref=None):
         self._notify({"id": self.new_id("NTF"), "at": self.now_iso(), "employee_id": employee_id, "text": text,
                       "text_ar": text_ar or text, "kind": kind, "ref": ref})
@@ -84,6 +108,7 @@ class JsonStore(BaseStore):
             self._save()
 
     def reset(self):
+        self._comp = None
         with _lock:
             self.data = self._empty()
             self._save()
@@ -237,6 +262,9 @@ class JsonStore(BaseStore):
     def flag_get(self, key):
         return bool(self.data["flags"].get(key))
 
+    def _flag_keys(self):
+        return [k for k in self.data["flags"] if "|" in k]
+
     def flag_set(self, key):
         with _lock:
             self.data["flags"][key] = True
@@ -363,6 +391,7 @@ class PgStore(BaseStore):
             return c.execute(sql, args).fetchone()
 
     def reset(self):
+        self._comp = None
         self._x("TRUNCATE " + ", ".join(TABLES) + " RESTART IDENTITY")
 
     def health(self):
@@ -526,6 +555,9 @@ class PgStore(BaseStore):
     # flags
     def flag_get(self, key):
         return self._one("SELECT 1 FROM flags WHERE key=%s", (key,)) is not None
+
+    def _flag_keys(self):
+        return [r[0] for r in self._all("SELECT key FROM flags WHERE key LIKE %s", ("%|%",))]
 
     def flag_set(self, key):
         self._x("INSERT INTO flags (key) VALUES (%s) ON CONFLICT DO NOTHING", (key,))

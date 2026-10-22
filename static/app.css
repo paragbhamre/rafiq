@@ -476,3 +476,7 @@ th { color: var(--ink-3); font-weight: 500; }
 .ctx .ctx-clear { margin-inline-start: 0; color: var(--ink-3); font-weight: 500; }
 .ctx .ctx-clear:hover { color: var(--accent-ink); }
 .ctx .ctx-clear.sure { color: var(--red); }
+
+/* next-update promise flags (WFL-CS-10) */
+.due-late { color: var(--red, #b42318); font-weight: 600; }
+.due-today { color: var(--amber, #8a5a00); font-weight: 600; }

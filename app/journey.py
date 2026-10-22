@@ -53,6 +53,9 @@ def _completed(emp_id):
     done = {}
     for ev in pack.events.get(emp_id, []):
         done[ev["event_code"]] = ev["event_timestamp"]
+    for (e, code), date in state.completions()["steps"].items():   # completed by a named owner (WFL-CS-04)
+        if e == emp_id:
+            done.setdefault(code, date)
     return done
 
 
@@ -153,6 +156,9 @@ def evaluate(emp_id, as_of=None):
     for q in all_requests(emp_id):
         q = dict(q)
         q["priority"] = state.priority_for(q["request_id"]) or q.get("priority", "")
+        closed_on = state.completions()["requests"].get(q["request_id"])
+        if closed_on and q["status"] not in ("RESOLVED", "CLOSED"):
+            q["status"], q["resolved_at"] = "RESOLVED", closed_on
         open_ = q["status"] not in ("RESOLVED", "CLOSED")
         if open_ and q.get("created_at"):
             created = dt.date.fromisoformat(q["created_at"][:10])
@@ -175,6 +181,7 @@ def evaluate(emp_id, as_of=None):
                      f"الطلب {q['request_id']} مفتوح منذ {do} أيام مقابل مستوى خدمة {sla:g} يوم")
             s["request_id"] = q["request_id"]
             s["owner_team"] = q["owner_team"]
+            s["policy"] = list(dict.fromkeys(["POL-SRV-001 §3.2"] + s["policy"]))   # ageing rule always cited (DEF-046)
             signals.append(s)
         if q["status"] == "PENDING_INFO":
             upd = dt.date.fromisoformat((q.get("last_updated_at") or q["created_at"])[:10])

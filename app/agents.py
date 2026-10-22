@@ -134,6 +134,7 @@ def _case(emp_id, ctype, title, summary, owner, signals, shared_items, policy, l
         "hrbp": {"id": emp["hrbp_id"], "name": emp["hrbp_name"]}, "status": "OPEN",
         "created_at": state.now_iso(), "signals": signals, "shared_items": shared_items,
         "policy": _cites(policy), "linked_request": linked_request, "notes": [],
+        "step": next((x.get("step") for x in signals if x.get("step")), None),
         "next_update_due": (config.AS_OF + dt.timedelta(days=1)).isoformat(),
     }
     state.add_case(case)
@@ -253,7 +254,7 @@ def escalate(emp_id, ev, step_code=None, include_pulse=False, employee_note="", 
     if warning:
         # One case per problem (DEF-014): the employee's handoff joins the early warning already with this owner
         case = warning
-        case.update({"type": "EMPLOYEE_HANDOFF", "title": title, "summary": summary,
+        case.update({"type": "EMPLOYEE_HANDOFF", "title": title, "summary": summary, "step": step_code or case.get("step"),
                      "signals": [_clean_signal(s) for s in ops], "shared_items": shared, "policy": _cites(policy),
                      "linked_request": linked["request_id"] if linked else case.get("linked_request"),
                      "status": "OPEN", "joined_early_warning": True,
@@ -265,6 +266,9 @@ def escalate(emp_id, ev, step_code=None, include_pulse=False, employee_note="", 
     else:
         case = _case(emp_id, "EMPLOYEE_HANDOFF", title, summary, owner, [_clean_signal(s) for s in ops],
                      shared, policy, linked["request_id"] if linked else None, actor=actor)
+    if case.get("step") != step_code:   # an HRBP handoff covers several items, not one step
+        case["step"] = step_code
+        state.save_case(case)
     state.notify(emp_id, f"Handed to {owner['name']} ({owner['role']}). Case {case['case_id']}. "
                          f"You'll hear back by {case['next_update_due']}. Your HRBP {emp['hrbp_name']} is copied.",
                  f"تم تحويل طلبك إلى {owner['name']} ({owner['role']}). رقم الحالة {case['case_id']}. "
@@ -290,12 +294,23 @@ def _set_priority(request_id, priority):
     state.set_priority(request_id, priority)
 
 
-def update_case(case_id, status=None, note=None, actor="hrbp", actor_name=None):
+def case_step(c):
+    """The journey step a case is about (the root cause for early warnings)."""
+    return c.get("step") or next((s.get("step") for s in c.get("signals", []) if s.get("step")), None)
+
+
+def update_case(case_id, status=None, note=None, actor="hrbp", actor_name=None, step_done=False):
     c = state.get_case(case_id)
     if not c:
         return None
     if status:
         c["status"] = status
+    if status == "RESOLVED" and step_done and case_step(c):
+        # The owner confirms the step itself is now complete: the employee's journey updates and dependants re-evaluate
+        state.add_completion(c["employee_id"], case_step(c), config.AS_OF.isoformat(), c.get("linked_request"))
+        c["step_completed"] = case_step(c)
+        c["notes"].append({"at": state.now_iso(), "by": actor, "by_name": actor_name or actor,
+                           "text": "Resolved: step marked complete" + (f"; {c['linked_request']} closed" if c.get("linked_request") else "") + "."})
     if note:
         c["notes"].append({"at": state.now_iso(), "by": actor, "by_name": actor_name or actor, "text": note})
     state.save_case(c)

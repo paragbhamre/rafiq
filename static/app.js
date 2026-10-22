@@ -44,6 +44,12 @@ const t = (k, vars = {}) => { let s = (T[S.lang][k] ?? T.en[k] ?? k); if (typeof
 
 /* ------------------------------------------------------------------ helpers */
 const $ = (sel, el = document) => el.querySelector(sel);
+// Next-update promise to the employee: flag it when it is due today or has been missed (WFL-CS-10)
+const dueTag = (c) => { if (!S.health || c.status === "RESOLVED" || !c.next_update_due) return "";
+  const t = S.health.as_of, ar = S.lang === "ar";
+  if (c.next_update_due < t) return ` · <span class="due-late">${ar ? "التحديث متأخر" : "Update overdue"}</span>`;
+  if (c.next_update_due === t) return ` · <span class="due-today">${ar ? "التحديث مستحق اليوم" : "Update due today"}</span>`;
+  return ""; };
 const yourWords = (x) => (x === "Employee's note" ? (S.lang === "ar" ? "ملاحظتك" : "Your note") : x);   // employee-facing wording
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 function headers() { return { "Content-Type": "application/json", "X-Rafiq-Request": "1" }; }
@@ -932,7 +938,10 @@ async function openMyData() {
     <div class="md-sec"><h3>${L("Check-in feedback consent", "الموافقة على ملاحظات الاستطلاع")}</h3>
       <div class="switch"><span class="state-pill ${d.consent.pulse_active ? "st-GREEN" : "st-AMBER"}">${d.consent.pulse_active ? L("Opted in", "موافق") : d.consent.state === "WITHDRAWN" ? L("Withdrawn", "تم سحب الموافقة") : L("Not opted in", "غير موافق")}</span>
       <button class="btn" id="consentBtn">${d.consent.pulse_active ? L("Withdraw consent", "سحب الموافقة") : L("Opt in", "الموافقة")}</button></div>
-      <p class="small muted" style="margin-top:6px">${L("If you withdraw, your responses stop being used immediately and are deleted within 30 days. It has no effect on the help you get.", "عند السحب يتوقف استخدام ردودك فوراً وتُحذف خلال 30 يوماً، دون أي أثر على الخدمة التي تتلقاها.")}</p></div>
+      <p class="small muted" style="margin-top:6px">${(() => { const due = (d.pulse.find((p) => p.deletion_due) || {}).deletion_due;
+        if (d.consent.pulse_active) return L("If you withdraw, your responses stop being used immediately and are deleted within 30 days. It has no effect on the help you get.", "عند السحب يتوقف استخدام ردودك فوراً وتُحذف خلال 30 يوماً، دون أي أثر على الخدمة التي تتلقاها.");
+        if (d.consent.state === "WITHDRAWN") return L(`You withdrew consent. Your responses are no longer used${due ? ` and will be deleted by ${fmtDate(due)}` : ""}. You can opt in again at any time; it has no effect on the help you get.`, `لقد سحبت موافقتك. لم تعد ردودك مستخدمة${due ? ` وستُحذف بحلول ${fmtDate(due)}` : ""}. يمكنك الموافقة مجدداً في أي وقت، دون أي أثر على الخدمة التي تتلقاها.`);
+        return L("You have not opted in, so your check-in responses are not used. You can opt in at any time; it has no effect on the help you get.", "لم توافق بعد، لذلك لا تُستخدم ردودك في الاستطلاع. يمكنك الموافقة في أي وقت، دون أي أثر على الخدمة التي تتلقاها."); })()}</p></div>
     <div class="md-sec"><h3>${L("Your check-in responses", "ردودك في الاستطلاع")}</h3>
       ${d.pulse.length ? `<table><tr><th>${L("Date", "التاريخ")}</th><th>${L("Score", "التقييم")}</th><th>${L("Comment", "التعليق")}</th><th>${L("Used by Rafiq", "يستخدمه رفيق")}</th></tr>${d.pulse.map((p) => `<tr><td>${fmtDate(p.submitted_at)}</td><td>${p.score}/5</td><td>${esc(p.comment)}</td><td>${p.used_by_companion ? L("Yes", "نعم") : `${L("No, withdrawn", "لا، مسحوبة")}${p.deletion_due ? ` · ${L("deleted by", "تُحذف قبل")} ${fmtDate(p.deletion_due)}` : ""}`}</td></tr>`).join("")}</table>` : `<p class="muted small">${L("None.", "لا يوجد.")}</p>`}</div>
     <div class="md-sec"><h3>${L("Signals Rafiq has flagged about you", "التنبيهات المسجلة عنك")}</h3>
@@ -1039,13 +1048,13 @@ async function renderInbox() {
       <div class="filters">${["OPEN", "ACKNOWLEDGED", "RESOLVED", "ALL"].map((f) => `<button data-f="${f}" aria-pressed="${S.caseFilter === f}">${({ OPEN: L("Open", "مفتوحة"), ACKNOWLEDGED: L("Acknowledged", "مستلمة"), RESOLVED: L("Resolved", "مغلقة"), ALL: L("All", "الكل") })[f]}</button>`).join("")}</div>
       <div class="case-list">${filtered.length ? filtered.map((c) => `<button class="case-item" data-id="${c.case_id}" aria-current="${c.case_id === S.selectedCase}">
         <div style="display:flex;justify-content:space-between;gap:8px"><span class="t">${esc(c.employee_name)}</span><span class="kind ${c.type}">${kinds[c.type]}</span></div>
-        <div class="small">${esc(c.title)}</div><div class="s">${esc(c.case_id)} · ${esc(c.owner.name)}</div></button>`).join("") : `<p class="empty">${L("No cases here.", "لا توجد حالات.")}</p>`}</div></section>
+        <div class="small">${esc(c.title)}</div><div class="s">${esc(c.case_id)} · ${esc(c.owner.name)}${dueTag(c)}</div></button>`).join("") : `<p class="empty">${L("No cases here.", "لا توجد حالات.")}</p>`}</div></section>
     <section class="panel" id="caseDetail">${sel ? caseDetail(sel, kinds) : `<p class="empty">${L("Select a case.", "اختر حالة.")}</p>`}</section>
   </div>`;
   document.querySelectorAll(".filters button").forEach((b) => b.onclick = () => { S.caseFilter = b.dataset.f; renderInbox(); });
   document.querySelectorAll(".case-item").forEach((b) => b.onclick = () => { S.selectedCase = b.dataset.id; renderInbox(); });
   document.querySelectorAll("[data-status]").forEach((b) => b.onclick = async () => {
-    await api(`/api/cases/${S.selectedCase}`, { method: "POST", body: JSON.stringify({ status: b.dataset.status, note: $("#caseNote").value || null }) });
+    await api(`/api/cases/${S.selectedCase}`, { method: "POST", body: JSON.stringify({ status: b.dataset.status, note: $("#caseNote").value || null, step_done: b.dataset.status === "RESOLVED" && !!($("#stepDone") && $("#stepDone").checked) }) });
     toast(L("Case updated. The employee has been told.", "تم تحديث الحالة وإبلاغ الموظف.")); renderInbox();
   });
 }
@@ -1055,7 +1064,7 @@ function caseDetail(c, kinds) {
   <div class="panel-b">
     <dl class="kv"><dt>${L("Employee", "الموظف")}</dt><dd>${esc(c.employee_name)} (${esc(c.employee_id)})</dd>
       <dt>${L("Named owner", "المسؤول")}</dt><dd><strong>${esc(c.owner.name)}</strong>, ${esc(c.owner.role)}</dd>
-      <dt>HRBP</dt><dd>${esc(c.hrbp.name)}</dd><dt>${L("Next update due", "موعد التحديث")}</dt><dd>${esc(c.next_update_due)}</dd>
+      <dt>HRBP</dt><dd>${esc(c.hrbp.name)}</dd><dt>${L("Next update due", "موعد التحديث")}</dt><dd>${fmtDate(c.next_update_due)}${dueTag(c)}</dd>
       ${c.linked_request ? `<dt>${L("Linked request", "الطلب المرتبط")}</dt><dd>${esc(c.linked_request)}</dd>` : ""}</dl>
     <h3 style="margin-top:14px">${L("Summary", "الملخص")}</h3><p style="margin-top:4px">${esc(c.summary)}</p>
     ${c.signals.length ? `<h3 style="margin-top:14px">${L("Signals", "التنبيهات")}</h3>${c.signals.map((s) => `<div class="sig ${s.level}">${esc(s.message)}</div>`).join("")}` : ""}
@@ -1067,6 +1076,8 @@ function caseDetail(c, kinds) {
     <textarea id="caseNote" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:8px;min-height:60px"></textarea>
     <div class="acts">${c.status !== "ACKNOWLEDGED" && c.status !== "RESOLVED" ? `<button class="btn primary" data-status="ACKNOWLEDGED">${L("Acknowledge and take ownership", "الاستلام وتولي المسؤولية")}</button>` : ""}
       ${c.status !== "RESOLVED" ? `<button class="btn" data-status="RESOLVED">${L("Mark resolved", "إغلاق الحالة")}</button>` : `<button class="btn" data-status="OPEN">${L("Reopen", "إعادة فتح")}</button>`}</div>
+    ${c.status !== "RESOLVED" && c.step ? `<label class="small" style="display:flex;gap:8px;align-items:center;margin-top:8px"><input type="checkbox" id="stepDone"> ${L("When resolving: the step itself is now complete (updates the employee's journey and closes the linked request)", "عند الإغلاق: اكتملت الخطوة نفسها (يحدّث رحلة الموظف ويغلق الطلب المرتبط)")}</label>` : ""}
+    ${c.step_completed ? `<p class="small muted" style="margin-top:6px">${L("Step marked complete when this case was resolved.", "تم تسجيل اكتمال الخطوة عند إغلاق هذه الحالة.")}</p>` : ""}
   </div>`;
 }
 
