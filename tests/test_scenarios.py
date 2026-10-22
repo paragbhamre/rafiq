@@ -541,3 +541,18 @@ def test_s04_rafiq_does_not_chase_the_manager_itself():
     assert "POL-MOB-001 §4.1" in cites(r)
     for q in ("Can you tell me my housing allowance?", "Can IT give me a loan laptop?", "Who is my manager?"):
         assert ask("EMP-1007" if "housing" in q else "EMP-1001", q)["intent"] != "DECLINED_ON_BEHALF", q
+
+
+def test_s05_shift_clash_is_recognised_and_passed_to_ld():
+    # SCN-S05-01 / S05-03
+    state.reset()
+    for q in ("Honestly I feel lost. Nobody told me where to go.", "I work nights and keep missing everything. Can someone help?"):
+        r = ask("EMP-1005", q)
+        assert r["intent"] == "TOPIC:lost" and "shift clash" in r["reply"], q
+        assert any(a.get("request_key") == "LD_REBOOK_INDUCTION" for a in r["actions"])
+        hrbp = [a for a in r["actions"] if a["type"] == "ESCALATE" and a["owner"]["name"] == "Claire Dupont"]
+        assert hrbp and hrbp[0]["can_include_pulse"] is True       # consent ACTIVE: she may choose to share
+    p = client.post("/api/employee/EMP-1005/actions", json={"preview": True, "action": {
+        "type": "RAISE_REQUEST", "request_key": "LD_REBOOK_INDUCTION", "step": "INDUCTION_COMPLETED"}},
+        headers=H("employee", "EMP-1005")).json()["preview"]
+    assert any(d["label"] == "History" and "shift clash" in d["value"] for d in p["details"])

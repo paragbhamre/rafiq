@@ -33,7 +33,7 @@ TOPICS = [
     ("background", r"background|reference check|haven.?t heard|heard (nothing|anything|back)|no news|not heard|التحقق من الخلفية", ["BACKGROUND_CHECK_CLEARED", "OFFER_ACCEPTED"]),
     ("checkin", r"check.?in|catch.?up|meant to (check|meet|talk|see)|30.?day|المتابعة|اجتماع المتابعة", ["CHECKIN_30_DONE"]),
     ("ticket", r"ticket|\bflight\b|\bfly\b|baggage|luggage|تذكرة", ["JOINING_TICKET_ISSUED"]),
-    ("lost", r"\blost\b|where to go|nobody (told|has)|no one (told|has)|who (do i|to) ask|don.?t know who|buddy|confus|overwhelm|ضائع|لا أعرف", ["BUDDY_ASSIGNED", "INDUCTION_COMPLETED"]),
+    ("lost", r"\blost\b|where to go|work(ing)? nights|night shifts?|on shifts?|shift (work|pattern|clash)|my roster|keep missing|nobody (told|has)|no one (told|has)|who (do i|to) ask|don.?t know who|buddy|confus|overwhelm|ضائع|لا أعرف", ["BUDDY_ASSIGNED", "INDUCTION_COMPLETED"]),
     ("training", r"induction|training|course|e-?learning|تدريب|التعريف", ["INDUCTION_COMPLETED", "MANDATORY_TRAINING_BOOKED", "ROLE_TRAINING_BOOKED"]),
     ("staff_id", r"staff id|\bbadge\b|\bpass\b|id card|building|sign(ed)? me in|let me in|airside|turnstile|swipe|بطاقة|المبنى", ["STAFF_ID_ISSUED"]),
     ("move", r"\bmove\b|transfer|new role|endorse|release date|handover|انتقال|الانتقال", ["RECEIVING_MANAGER_ENDORSED", "RELEASING_MANAGER_RELEASED", "TRANSFER_APPROVED", "TRANSFER_LETTER_ISSUED", "HANDOVER_COMPLETED", "MOVE_EFFECTIVE"]),
@@ -207,6 +207,12 @@ def _request_for(ev, code):
                  and q["status"] not in ("RESOLVED", "CLOSED")), None)
 
 
+def missed_events(emp_id, step_code):
+    """Informational events such as INDUCTION_MISSED that explain why a step is late."""
+    stem = step_code.rsplit("_", 1)[0]
+    return [e for e in pack.events.get(emp_id, []) if e["event_code"] == stem + "_MISSED"]
+
+
 def _describe_step(draft, ev, step, emp, detail=True):
     ar = draft.lang == "ar"
     label = step["label_ar"] if ar else step["label"]
@@ -231,6 +237,12 @@ def _describe_step(draft, ev, step, emp, detail=True):
     else:
         draft.say(f"🗓️ **{label}** — on track, target {due}. Owner: {step['owner_team']}.",
                   f"🗓️ **{label}** — يسير وفق الخطة، الموعد المستهدف {due}. الجهة المسؤولة: {_team(step['owner_team'], True)}.")
+    missed = missed_events(ev["employee_id"], step["code"])
+    if missed and st not in ("DONE", "DONE_LATE"):
+        m = missed[-1]
+        why = (" — " + m["notes"][:1].lower() + m["notes"][1:].rstrip(".")) if m.get("notes") else ""
+        draft.say(f"Your earlier session was missed on {_fmt_date(m['event_timestamp'][:10], ar)} ({m['event_label'].split('(')[-1].rstrip(')') if '(' in m['event_label'] else 'missed'}){why}.",
+                  f"فاتتك الجلسة السابقة بتاريخ {_fmt_date(m['event_timestamp'][:10], True)}{why}.")
     if not detail:
         return
     req = _request_for(ev, step["code"])
@@ -619,8 +631,8 @@ def _journey_fallback(draft, ev, emp, msg):
     if not problems:
         return False
     draft.intent = "JOURNEY_FALLBACK"
-    draft.say("I can't match that to a specific policy, but here's what is holding things up in your journey right now:",
-              "لا أستطيع ربط سؤالك بسياسة محددة، لكن هذا ما يؤخر رحلتك حالياً:")
+    draft.say("Here's what is holding things up in your journey right now:",
+              "هذا ما يؤخر رحلتك حالياً:")
     for s in problems[:2]:
         draft.steps.append(s["code"])
         _describe_step(draft, ev, s, emp)

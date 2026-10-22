@@ -179,6 +179,9 @@ def _request_details(emp_id, ev, key, step):
         rows.append(("Reason", f"{step['label']}: {step['status'].replace('_', ' ').lower()} (target {step['target_date']}{late})"))
         linked = [q for q in ev["requests"] if q.get("linked_event_code") == step["code"]
                   and q["status"] not in ("RESOLVED", "CLOSED") and q.get("request_key") != key]
+        from .companion import missed_events
+        for m in missed_events(emp_id, step["code"])[-1:]:
+            rows.append(("History", f"{m['event_label']} on {m['event_timestamp'][:10]}" + (f": {m['notes']}" if m.get("notes") else "")))
         if linked:
             rows.append(("Related requests", "; ".join(f"{q['request_id']} ({q['subject']}, {q['owner_name']}, "
                                                       f"open {q['days_open']} days)" for q in linked)))

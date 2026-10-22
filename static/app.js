@@ -780,7 +780,7 @@ async function doAction(a, btn) {
 
 // Requests: show the pre-filled request (exactly what the team receives) before anything is raised
 const REQ_LABEL_AR = { "Employee": "الموظف", "Role": "الوظيفة", "Location": "الموقع", "Line manager": "المدير المباشر",
-  "Journey": "الرحلة", "Move effective": "سريان الانتقال", "Reason": "السبب", "Related requests": "طلبات مرتبطة",
+  "Journey": "الرحلة", "Move effective": "سريان الانتقال", "Reason": "السبب", "Related requests": "طلبات مرتبطة", "History": "السجل",
   "Policy": "السياسة", "Service level": "مستوى الخدمة" };
 async function confirmRequest(a, btn) {
   const ar = S.lang === "ar";
