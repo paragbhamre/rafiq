@@ -336,3 +336,15 @@ def test_ADV_14_does_not_act_for_others():
 def test_ADV_15_very_long_input_is_handled():
     r = chat("EMP-1001", "laptop " * 2000)
     assert r["reply"]
+
+
+def test_DEF045_early_warning_told_from_the_root_cause():
+    from app.journey import evaluate, operational_signals
+    from app.agents import _root_first
+    ev = evaluate("EMP-1301")
+    sigs = _root_first(ev, [s for s in operational_signals(ev) if s["level"] == "RED"])
+    assert sigs[0]["step"] == "BACKGROUND_CHECK_CLEARED"
+    visa = next(s for s in sigs if s["type"] == "STEP_STALLED" and s["step"] == "VISA_APPLICATION_SUBMITTED")
+    assert visa["message"].endswith("waiting on Background and reference check cleared")
+    case = next(c for c in state.cases(employee_id="EMP-1301") if c["type"] == "EARLY_WARNING")
+    assert case["owner"]["name"] == "Reem Al Hashimi" and "waiting on Background" in case["summary"]

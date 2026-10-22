@@ -145,8 +145,31 @@ def _clean_signal(s):
     return {k: s.get(k) for k in ("level", "type", "step", "step_label", "message", "request_id", "owner_team")}
 
 
+def _root_first(ev, signals):
+    """Owner-facing signals told from the root cause (DEF-045): a late step that is only late because it waits
+    on another late step says so, and 'holding up' chains start at the root."""
+    steps = {s["code"]: s for s in ev["steps"]}
+    out = []
+    for sig in signals:
+        sig = dict(sig)
+        st = steps.get(sig.get("step"))
+        root = (st or {}).get("blocked_by")
+        if root:
+            lbl = sig.get("step_label") or st["label"]
+            if sig["type"] == "BLOCKING":
+                sig["message"] = sig["message"].replace(f"{lbl} is holding up",
+                                                        f"{root['label']} is holding up {lbl}, which is holding up", 1)
+            elif sig["type"] in ("STEP_STALLED", "STEP_AT_RISK") and "waiting on" not in sig["message"]:
+                sig["message"] = f"{sig['message']}, waiting on {root['label']}"
+            sig["blocked_by"] = root["code"]
+        out.append(sig)
+    # roots first, dependants after, original order otherwise
+    return sorted(out, key=lambda x: 1 if x.get("blocked_by") else 0)
+
+
 def open_early_warning(emp_id, ev, ops_signals):
     """System-raised early warning from operational data only (no sentiment)."""
+    ops_signals = _root_first(ev, ops_signals)
     first = ops_signals[0]
     if first.get("escalation"):
         owner = first["escalation"]

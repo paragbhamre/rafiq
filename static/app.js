@@ -1060,7 +1060,7 @@ function caseDetail(c, kinds) {
     <h3 style="margin-top:14px">${L("Summary", "الملخص")}</h3><p style="margin-top:4px">${esc(c.summary)}</p>
     ${c.signals.length ? `<h3 style="margin-top:14px">${L("Signals", "التنبيهات")}</h3>${c.signals.map((s) => `<div class="sig ${s.level}">${esc(s.message)}</div>`).join("")}` : ""}
     ${c.policy.length ? `<p style="margin-top:12px">${c.policy.map((p) => `<button class="cite" data-cite="${p}">${p}</button>`).join(" ")}</p>` : ""}
-    <div class="guard"><strong>${L("Shared by the employee:", "ما شاركه الموظف:")}</strong> ${c.shared_items.map(esc).join(", ")}.<br>
+    <div class="guard"><strong>${c.type === "EARLY_WARNING" ? L("Raised automatically from journey data (the employee did not send this):", "أُنشئ تلقائياً من بيانات الرحلة (لم يرسله الموظف):") : L("Shared by the employee:", "ما شاركه الموظف:")}</strong> ${c.shared_items.map(esc).join(", ")}.<br>
       ${L("Conversations are never shared. Check-in feedback appears only if the employee chose to include it. Not for use in performance, probation or disciplinary decisions.", "لا تتم مشاركة المحادثات أبداً. تظهر ملاحظات الاستطلاع فقط إذا اختار الموظف ذلك. لا يجوز استخدامها في قرارات الأداء أو التجربة أو التأديب.")} ${citeBtn("POL-PRV-001 §6.2")}</div>
     ${c.notes.length ? `<h3 style="margin-top:14px">${L("Notes", "ملاحظات")}</h3><ul class="notes">${c.notes.map((n) => `<li>${esc(n.at.slice(0, 10))} · ${esc(n.by_name || (String(n.by).startsWith("employee:") ? "Rafiq (system)" : n.by))}: ${esc(n.text)}</li>`).join("")}</ul>` : ""}
     <label class="small" for="caseNote" style="display:block;margin-top:14px">${L("Note to the employee (optional)", "ملاحظة للموظف (اختياري)")}</label>
