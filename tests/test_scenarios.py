@@ -482,3 +482,14 @@ def test_s01_escalation_preview_shows_exact_case_and_changes_nothing():
         assert len(state.cases_for("EMP-1001")) == cases_before
     c = client.post("/api/employee/EMP-1001/actions", json={"action": a}, headers=H("employee", "EMP-1001")).json()["case"]
     assert c["summary"].replace("raised to HIGH", "") == p["summary"].replace("will be raised to HIGH", "")
+
+
+def test_s01_paraphrase_leads_with_the_laptop_root_cause():
+    # SCN-S01-03: "can't log in" is about access, but access waits on the laptop -> lead with the laptop fix
+    state.reset()
+    r = ask("EMP-1001", "My induction is today but I can't log in to anything. Help?")
+    assert "waiting on an earlier step" in r["reply"] and "Laptop and phone issued" in r["reply"]
+    assert "corporate induction attended (due today)" in r["reply"]
+    assert any(a.get("request_key") == "IT_LOAN_DEVICE" for a in r["actions"])
+    assert "Priya Raman" in {a["owner"]["name"] for a in primary_escalation(r)}
+    assert {"POL-IT-001 §5.1", "POL-LRN-001 §5.1"} <= cites(r)

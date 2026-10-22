@@ -297,6 +297,25 @@ def _offer_step_actions(draft, ev, step, emp):
         _escalate_action(draft, step, primary=red)
 
 
+def _blocking_roots(ev, step):
+    """Earliest stalled/at-risk steps that this step is (transitively) waiting on."""
+    by = {x["code"]: x for x in ev["steps"]}
+    out, seen, todo = [], set(), list(step.get("waiting_on", []))
+    while todo:
+        c = todo.pop(0)
+        if c in seen or c not in by:
+            continue
+        seen.add(c)
+        x = by[c]
+        if x["status"] in ("STALLED", "AT_RISK"):
+            deeper = [w for w in x.get("waiting_on", []) if by.get(w, {}).get("status") in ("STALLED", "AT_RISK")]
+            if deeper:
+                todo += deeper
+            elif x not in out:
+                out.append(x)
+    return out
+
+
 def compose_topic(draft, ev, emp, topic, codes):
     steps = {s["code"]: s for s in ev["steps"]}
     candidates = [steps[c] for c in codes if c in steps]
@@ -319,7 +338,27 @@ def compose_topic(draft, ev, emp, topic, codes):
                   "يؤسفني أنك شعرت بذلك — دعنا نحدد الآن من يمكنك اللجوء إليه.")
     elif not problem and topic != "allowance":
         draft.say("Good news — this part of your journey is on track.", "أخبار جيدة — هذا الجزء من رحلتك يسير وفق الخطة.")
+    # Root cause first: if a late step is only late because an earlier step is stuck (access waits on the
+    # laptop), lead with that earlier step and its fix, then say what it is holding up.
+    roots = []
     for s in focus:
+        for r in _blocking_roots(ev, s):
+            if r not in roots and r not in focus:
+                roots.append(r)
+    if roots:
+        for r in roots[:1]:
+            names = ", ".join((x["label_ar"] if draft.lang == "ar" else x["label"]) for x in focus)
+            draft.say(f"**{names}** is waiting on an earlier step that's stuck — that's the one to fix first:",
+                      f"**{names}** بانتظار خطوة سابقة متعثرة — وهي التي يجب حلها أولاً:")
+            draft.steps.append(r["code"])
+            _describe_step(draft, ev, r, emp)
+            _step_policy(draft, r)
+            _offer_step_actions(draft, ev, r, emp)
+        for s in focus:
+            draft.steps.append(s["code"])
+            _step_policy(draft, s, max_lines=1)
+            _offer_step_actions(draft, ev, s, emp)
+    for s in ([] if roots else focus):
         draft.steps.append(s["code"])
         _describe_step(draft, ev, s, emp)
         _step_policy(draft, s)
