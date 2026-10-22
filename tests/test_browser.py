@@ -256,3 +256,15 @@ def test_NFR_01_and_07_latency_and_concurrent_load(base):
     p95_load = sorted(t for _, t in res)[int(0.95 * len(res)) - 1]
     print(f"p95 single {p95_seq:.2f}s, p95 under 20 concurrent users {p95_load:.2f}s")
     assert p95_seq < 3 and p95_load < 8
+
+
+def test_DEF057_case_stays_selected_after_acknowledge(browser, base):
+    pg = page_for(browser, base, "owner.priya.raman")
+    nav(pg, page="cases")
+    item = pg.locator(".case-item").nth(1)
+    cid = item.get_attribute("data-id")
+    item.click(); pg.wait_for_timeout(300)
+    pg.click('[data-status="ACKNOWLEDGED"]'); pg.wait_for_timeout(600)
+    assert cid in pg.inner_text("#caseDetail")                       # still the same case, now under Acknowledged
+    assert pg.locator('.filters button[data-f="ACKNOWLEDGED"]').get_attribute("aria-pressed") == "true"
+    pg.context.close()

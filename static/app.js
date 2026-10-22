@@ -1065,7 +1065,10 @@ async function renderInbox() {
   document.querySelectorAll(".case-item").forEach((b) => b.onclick = () => { S.selectedCase = b.dataset.id; renderInbox(); });
   document.querySelectorAll("[data-status]").forEach((b) => b.onclick = async () => {
     await api(`/api/cases/${S.selectedCase}`, { method: "POST", body: JSON.stringify({ status: b.dataset.status, note: $("#caseNote").value || null, step_done: b.dataset.status === "RESOLVED" && !!($("#stepDone") && $("#stepDone").checked) }) });
-    toast(L("Case updated. The employee has been told.", "تم تحديث الحالة وإبلاغ الموظف.")); renderInbox();
+    // keep the same case on screen after the change (DEF-057): follow it to its new tab instead of jumping to another case
+    S.caseFilter = b.dataset.status;
+    const who = (document.querySelector(`.case-item[data-id="${S.selectedCase}"] .t`) || {}).textContent || "";
+    toast(L(`${who ? who + ": " : ""}case ${S.selectedCase} updated. The employee has been told.`, `${who ? who + ": " : ""}تم تحديث الحالة ${S.selectedCase} وإبلاغ الموظف.`)); renderInbox();
   });
 }
 function caseDetail(c, kinds) {
