@@ -18,7 +18,7 @@ Identity comes only from a signed, HttpOnly, SameSite session cookie issued by t
 
 Deployed on Render from this repository using `render.yaml` (Docker, Frankfurt region, health check `/api/health`). The build runs the full test suite, so a broken commit never replaces the live version, and every push to `main` redeploys automatically.
 
-- On the **free** plan the app sleeps after 15 minutes idle, and the first visit then takes about 50 seconds. Switch to **Starter** during judging.
+- The web service runs on Render **Starter** during judging, so it never sleeps and the first visit loads in about 2 seconds. (On the free plan it would sleep after 15 idle minutes and take about 50 seconds to wake.)
 - **Data storage.** The synthetic pack is read-only files in `data/`. Everything created while using the app lives in **Render Postgres** (`rafiq-db`, Frankfurt, private network only, no public access): `requests`, `cases`, `consent_events` (append-only), `audit_log` (append-only), `notifications`, `conversations`, `request_priority` and `flags`. It survives sleeps and redeploys, and is safe with more than one instance (early warnings are seeded once, under a Postgres advisory lock). Locally, without `DATABASE_URL`, a JSON file is used instead.
 - Demo data is shared by all accounts. Sign in as `admin` to reset it to the starting state.
 - The optional AI writer is configured by environment variables in Render (see `.env.example`). Without them, or if the provider fails, Rafiq answers in offline mode automatically.
@@ -81,8 +81,8 @@ To reset the demo state, sign in as `admin` and use **Reset demo**.
 static/  (vanilla JS, no build)          app/
   Employee | Manager | HR | Owner          main.py       FastAPI routes + role-based access
   Insights | EN/AR RTL                     journey.py    stage, step status, friction signals (rules)
-        │  X-Rafiq-Role / User headers      policies.py   section index + BM25 + Arabic glossary
-        ▼  (SSO claims in a pilot)          companion.py  guardrails → router → grounded draft
+        │  signed session cookie            policies.py   section index + BM25 + Arabic glossary
+        ▼  (SSO in a pilot)                 companion.py  guardrails → router → grounded draft
   /api/employee/{id}/chat ───────────────▶  llm.py        optional writer: any approved provider (configured by environment)
   /api/employee/{id}/actions ────────────▶  agents.py     service agents + named-owner cases
   /api/cases  /api/manager  /api/insights   data.py       read-only pack
@@ -91,12 +91,14 @@ static/  (vanilla JS, no build)          app/
 
 ## Demo script (3 minutes)
 
-1. **Aisha, Day 5, no laptop** (`EMP-1001`). Rafiq flags the stall and that it blocks access and induction. It cites the loan-device and training-extension rules. Tap **Request a temporary loan device** and the IT agent confirms. Tap **Escalate to Priya Raman** and the dialog shows exactly what will be shared.
-2. **HR partner view** (Nadia Farouk). The handoff and the earlier early warning are in the inbox, with no sentiment attached. Acknowledge it, and the employee gets the update.
-3. **Rafael, visa stalled, flying next week** (`EMP-1002`). This is a blocking stall within 14 days of joining. Rafiq routes to the PRO Team Lead and HRBP and reassures him: no travel without a permit, and the date only changes with his agreement.
-4. **Shamma in Arabic** (`EMP-1007`). Housing allowance for her grade, answered in Arabic with citations.
-5. **Privacy** (`EMP-1011`): "Will my manager see this?" Then open **My data** for Andrei (`EMP-1006`): his consent was withdrawn, so his responses are unused and due for deletion.
-6. **Insights**: where journeys stall, by site, with small groups hidden.
+Before recording: sign in as `admin` and **Reset demo**, then reload the page.
+
+1. **Aisha, day 5, no laptop** (`aisha.rahman`, 0:15–1:05). Home shows the laptop step stalled and two steps waiting on it. In **Ask Rafiq**: "It's my first week and I still don't have a laptop. What do I do?" Rafiq names the root cause and what it holds up, cites the loan-device and training-extension rules, and offers actions. **Request a temporary loan device** previews the complete request before it is sent. **Escalate to Priya Raman** shows exactly what she will receive, what is not shared, and that it joins the case already open.
+2. **The named owner** (`owner.priya.raman`, 1:05–1:30). One case for Aisha, marked not for performance use. Tick "the step itself is now complete" and **Mark resolved**: Aisha's journey updates and her IT request closes.
+3. **Rafael, visa stalled, flying next week** (`rafael.santos`, 1:30–1:55). "Is my visa on track? I'm meant to fly next week." The medical is stalled and the visa at risk; Rafiq says not to book or travel yet and routes to the PRO Team Lead.
+4. **Shamma in Arabic** (`shamma.alfalasi`, 1:55–2:15). Switch to العربية: "كم بدل السكن الخاص بي؟" The amount for her grade, in Arabic, with the citation.
+5. **Privacy** (2:15–2:40). Hannah (`hannah.brown`): "If I tell you I'm struggling, will my manager see it? Will it affect my probation?" Then Andrei (`andrei.novak`) → **My data**: consent withdrawn, answers unused and due for deletion.
+6. **Insights** (`hr.nadia.farouk`, 2:40–3:00). Where journeys stall, by site, with groups under 10 people hidden.
 
 Fourteen seeded scenarios and their expected outcomes are listed in `data/scenarios.md`.
 
