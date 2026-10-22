@@ -556,3 +556,17 @@ def test_s05_shift_clash_is_recognised_and_passed_to_ld():
         "type": "RAISE_REQUEST", "request_key": "LD_REBOOK_INDUCTION", "step": "INDUCTION_COMPLETED"}},
         headers=H("employee", "EMP-1005")).json()["preview"]
     assert any(d["label"] == "History" and "shift clash" in d["value"] for d in p["details"])
+
+
+def test_s05_hrbp_preview_matches_the_case_with_and_without_feedback():
+    # SCN-S05-02 / PRV-04 / PRV-05: the dialog shows exactly what the HRBP gets, for both choices
+    a = {"type": "ESCALATE", "step": None, "owner": {"name": "Claire Dupont"}}
+    for include in (False, True):
+        state.reset()
+        p = client.post("/api/employee/EMP-1005/actions", json={"action": a, "preview": True, "include_pulse": include},
+                        headers=H("employee", "EMP-1005")).json()["preview"]
+        c = client.post("/api/employee/EMP-1005/actions", json={"action": a, "include_pulse": include},
+                        headers=H("employee", "EMP-1005")).json()["case"]
+        assert c["summary"] == p["summary"], include
+        assert ("Shared with consent" in c["summary"]) is include
+        assert ("Your check-in (pulse) answers" in p["not_shared"]) is (not include)
