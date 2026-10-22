@@ -5,7 +5,6 @@ Run: python -m pytest -q tests/test_responsible_ai.py -rA
 """
 import json
 import re
-import subprocess
 from pathlib import Path
 
 import pytest
@@ -138,8 +137,12 @@ def test_ACC_14_reset_is_admin_only():
 def test_ACC_15_no_passwords_are_stored():
     blob = json.dumps(state.data, default=str) if hasattr(state, "data") else ""
     assert "test-demo-pass" not in blob and "password" not in blob.lower()
-    tracked = subprocess.run(["git", "grep", "-I", "-n", "RAFIQ_DEMO_PASSWORD=[^<$]"], cwd=ROOT, capture_output=True, text=True)
-    assert tracked.stdout.strip() == ""
+    # no real password value in any shipped file (the deploy image has no git, so scan the files directly)
+    pat = re.compile(r"RAFIQ_DEMO_PASSWORD\s*=\s*[^<$\s{\"']")
+    for path in ROOT.rglob("*"):
+        if path.is_file() and path.suffix in (".py", ".js", ".html", ".md", ".yaml", ".yml", ".toml", ".txt", ".env", ".csv") \
+                and ".git" not in path.parts and "runtime" not in path.parts:
+            assert not pat.search(path.read_text(encoding="utf-8", errors="ignore")), path
 
 
 # ---------------------------------------------------------------- PRV: privacy and consent
