@@ -799,15 +799,24 @@ async function confirmRequest(a, btn) {
   };
 }
 
-function confirmEscalation(a, btn) {
+async function confirmEscalation(a, btn) {
   const consent = S.journey.consent_active && a.can_include_pulse;
   const ar = S.lang === "ar";
+  let p = null;  // exactly what the owner will receive (falls back to the generic list if the preview fails)
+  try { p = (await api(`/api/employee/${S.user}/actions`, { method: "POST", body: JSON.stringify({ action: a, preview: true }) })).preview; } catch (e) { p = null; }
+  const shareBox = p ? `<div class="share-box"><strong>${ar ? `هذا ما سيستلمه ${esc(a.owner.name)}:` : `This is what ${esc(a.owner.name)} will receive:`}</strong>
+        <p style="margin:8px 0 4px"><strong>${esc(p.title)}</strong></p><p style="margin:0 0 8px">${esc(p.summary)}</p>
+        ${p.policy.length ? `<p class="small muted">${ar ? "السياسات" : "Policy"}: ${p.policy.map((c) => esc(c.cite || c)).join(", ")}</p>` : ""}
+        <p class="small muted">${ar ? "تحديث متوقع بحلول" : "Next update due"}: ${fmtDate(p.next_update_due)}</p>
+        <p class="small muted" style="margin-top:8px">${ar ? "لن تتم مشاركة: محادثاتك مع رفيق" + (consent ? "" : "، وإجاباتك على استبيان المتابعة") : "Not shared: " + p.not_shared.join(", ").replace("Your check", "your check")}.</p>
+        ${p.existing_case ? `<p class="small" style="margin-top:8px">${ar ? `هذا الأمر لديه بالفعل (${esc(p.existing_case)}).` : `This is already with them (${esc(p.existing_case)}); nothing new will be sent.`}</p>` : ""}</div>`
+    : `<div class="share-box"><strong>${t("share_what")}</strong><ul>${t("share_items").map((x) => `<li>${x}</li>`).join("")}</ul>
+        <p class="small muted" style="margin-top:8px">${t("share_never")}</p></div>`;
   $("#dlgInner").innerHTML = `
     <div class="dlg-h"><h2>${t("share_title", { name: esc(a.owner.name) })}</h2></div>
     <div class="dlg-b">
       <p class="muted">${esc(a.owner.role)}${S.journey.employee.hrbp_name && a.owner.role !== "HR Business Partner" ? ` · ${ar ? "مع إشعار" : "cc"} ${esc(S.journey.employee.hrbp_name)}` : ""}</p>
-      <div class="share-box"><strong>${t("share_what")}</strong><ul>${t("share_items").map((x) => `<li>${x}</li>`).join("")}</ul>
-        <p class="small muted" style="margin-top:8px">${t("share_never")}</p></div>
+      ${shareBox}
       ${consent ? `<label class="check"><input type="checkbox" id="incPulse"> <span>${t("include_pulse")}</span></label>` : ""}
       <label class="small" for="note" style="display:block;margin-top:12px">${t("note")}</label>
       <textarea id="note" maxlength="400"></textarea>

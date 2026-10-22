@@ -466,3 +466,19 @@ def test_s01_loan_device_request_arrives_complete_and_previews_first():
 def test_page_and_script_are_revalidated_after_a_redeploy():
     for path in ("/", "/static/app.js", "/static/app.css"):
         assert client.get(path).headers.get("cache-control") == "no-cache", path
+
+
+def test_s01_escalation_preview_shows_exact_case_and_changes_nothing():
+    # SCN-S01-02: the dialog shows the real case text; preview opens no case and changes no priority
+    state.reset()
+    a = {"type": "ESCALATE", "step": "IT_KIT_ISSUED", "owner": {"name": "Priya Raman"}}
+    cases_before = len(state.cases_for("EMP-1001")) if hasattr(state, "cases_for") else None
+    p = client.post("/api/employee/EMP-1001/actions", json={"action": a, "preview": True}, headers=H("employee", "EMP-1001")).json()["preview"]
+    assert p["owner"]["name"] == "Priya Raman" and p["hrbp"] == "Nadia Farouk"
+    assert "SR-00001" in p["summary"] and "will be raised to HIGH" in p["summary"]
+    assert "score" not in p["summary"] and "Your check-in (pulse) answers" in p["not_shared"]
+    assert state.priority_for("SR-00001") in (None, "", "HIGH") and state.priority_for("SR-00001") != "HIGH"
+    if cases_before is not None:
+        assert len(state.cases_for("EMP-1001")) == cases_before
+    c = client.post("/api/employee/EMP-1001/actions", json={"action": a}, headers=H("employee", "EMP-1001")).json()["case"]
+    assert c["summary"].replace("raised to HIGH", "") == p["summary"].replace("will be raised to HIGH", "")

@@ -276,6 +276,8 @@ def run_action(emp_id: str, body: ActionIn, u: dict = Depends(require_self)):
         return {"ok": True, "kind": "request", **res}
     if t == "ESCALATE":
         include = bool(body.include_pulse and consent_active(emp_id))
+        if body.preview:
+            return {"ok": True, "kind": "preview", "preview": agents.escalate(emp_id, ev, a.get("step"), include, body.note, preview=True)}
         case = agents.escalate(emp_id, ev, a.get("step"), include, body.note, actor=f"employee:{emp_id}")
         return {"ok": True, "kind": "case", "case": case}
     if t == "ASK_HUMAN":
