@@ -29,7 +29,7 @@ from collections import defaultdict, deque
 from fastapi import HTTPException, Request
 
 from . import config
-from .data import pack
+from .data import pack, state
 
 COOKIE = "rafiq_session"
 SESSION_HOURS = float(os.getenv("RAFIQ_SESSION_HOURS", "8"))
@@ -239,6 +239,24 @@ def issue(acct):
     return f"{body}.{sig}"
 
 
+_REVOKED = set()
+
+
+def _revoked(nonce):
+    return nonce in _REVOKED or state.flag_get("revoked:" + nonce)
+
+
+def revoke(token):
+    """Sign-out ends the session on the server too: a copied cookie stops working (ACC-12)."""
+    try:
+        nonce = json.loads(_unb64(token.split(".", 1)[0])).get("n", "")
+    except Exception:  # noqa: BLE001
+        return
+    if nonce:
+        _REVOKED.add(nonce)
+        state.flag_set("revoked:" + nonce)
+
+
 def verify(token):
     try:
         body, sig = token.split(".", 1)
@@ -246,7 +264,7 @@ def verify(token):
         if not hmac.compare_digest(good, sig):
             return None
         payload = json.loads(_unb64(body))
-        if payload["exp"] < time.time():
+        if payload["exp"] < time.time() or _revoked(payload.get("n", "")):
             return None
         acct = directory.users.get(payload["u"])
         if not acct or acct["role"] != payload["r"] or acct["id"] != payload["i"]:

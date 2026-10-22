@@ -48,8 +48,16 @@ HUMAN_RE = r"talk to (a |an )?(human|person|someone|real)|speak (to|with) (hr|so
 EMOTION_RE = r"\blost\b|frustrat|stress|unhappy|struggl|honestly|overwhelm|worried|anxious|upset|nobody|no one|محبط|قلق"
 SMALLTALK_RE = r"^(hi|hello|hey|good (morning|afternoon|evening)|salam|marhaba|thanks|thank you|cheers|مرحبا|مرحباً|السلام عليكم|شكرا|شكراً)\b[!. ]*$"
 CONTACT_RE = r"who is my (hr|hrbp|hr business partner|manager|line manager|buddy)|who.?s my (hr|hrbp|manager)|من هو (مديري|شريك)"
-APPROVE_RE = r"(just )?approve (my|the)|sign off my|change my (joining|move|start) date|grant me|override"
-BYPASS_RE = r"ignore (your|the|all|previous) (rules|instructions)|pretend you|jailbreak|developer mode|system prompt"
+APPROVE_RE = (r"(just )?approve (my|the)|sign off my|grant me|override|"
+              r"\b(change|move|push|bring forward|postpone|delay|reschedule|extend|shift)\b[^.?!]{0,12}\bmy (joining|move|start|transfer|relocation) date|"
+              r"(غيّر|غير|أجّل|أجل|قدّم|قدم|تغيير|تأجيل) تاريخ (التحاقي|انتقالي|مباشرتي)")
+DATE_CHANGE_RE = r"\b(joining|move|start|transfer|relocation) date\b|تاريخ (التحاقي|انتقالي|مباشرتي)"
+BYPASS_RE = (r"ignore (your|the|all|previous) (rules|instructions)|pretend you|jailbreak|developer mode|system prompt|"
+             r"تجاهل (قواعدك|القواعد|التعليمات|تعليماتك)|(نتيجة|درجة|إجابات|بيانات) (استبيان|متابعة)? ?(زميلي|زميلتي|موظف آخر)|"
+             r"(استبيان|بيانات|طلبات|راتب) (زميلي|زميلتي)")
+OTHER_PERSON_ACT_RE = (r"\b(write|draft|send|submit|raise|file|sign|fill (in|out))\b[^.?!]{0,25}\b(my )?(colleague|co-?worker|teammate|team ?mate|friend|"
+                       r"another employee|someone else)(['’]s)?\b|\b(colleague|co-?worker|teammate|friend)(['’]s)? (resignation|leave|request|form|letter)|"
+                       r"(نيابة عن|بدلاً من) (زميلي|زميلتي|موظف آخر)|(استقالة|طلب) (زميلي|زميلتي)")
 MONITOR_RE = r"(which|who) of my (team|joiners|new joiners|reports)|my team.?s (mood|sentiment|feedback)|(unhappy|sentiment|morale|mood) of (my|the) team"
 REQUEST_RE = r"\brequests?\b|\bSR-?\d+|\bticket (number|status)|طلبي|طلباتي"
 REQUEST_CATEGORY = {"FACILITIES": r"facilit|parking|maintenance|مرافق", "IT": r"\bit\b|laptop|access|equipment",
@@ -795,6 +803,15 @@ def guardrails(draft, msg, emp):
                   "لا يمكنني المساعدة في ذلك. أعرض لك **معلوماتك فقط**، ولا يمكنني تجاوز القواعد التي تحمي خصوصية الجميع.")
         draft.policy_line("POL-PRV-001 §4.1", "• ", "• ")
         return True
+    if re.search(OTHER_PERSON_ACT_RE, msg, re.I):
+        draft.refused = True
+        draft.intent = "REFUSED_OTHER_PERSON"
+        draft.say("I can't do that. I only help you with **your own** journey, and I can't write, send or submit anything for "
+                  "another employee. They can ask Rafiq themselves, or speak with their HR Business Partner.",
+                  "لا يمكنني ذلك. أساعدك في رحلتك **أنت فقط**، ولا يمكنني كتابة أو إرسال أو تقديم أي شيء نيابة عن موظف آخر. "
+                  "يمكنه سؤال رفيق بنفسه أو التحدث مع شريك الموارد البشرية الخاص به.")
+        draft.policy_line("POL-PRV-001 §4.1", "• ", "• ")
+        return True
     if re.search(MONITOR_RE, msg, re.I):
         draft.refused = True
         draft.intent = "REFUSED_MONITORING"
@@ -810,6 +827,11 @@ def guardrails(draft, msg, emp):
                   "لا يمكنني اعتماد ذلك أو تغييره بنفسي — القرارات التي تخصك يتخذها دائماً شخص مسؤول. إليك الوضع الحالي والمسؤول عنه:")
         draft.policy_line("POL-PRV-001 §6.1", "• ", "• ")
         ev = evaluate(emp["employee_id"])
+        if re.search(DATE_CHANGE_RE, msg, re.I):
+            draft.say(f"A change to your date is agreed with you by your HR Business Partner ({emp['hrbp_name']}) and your manager.",
+                      f"يتم الاتفاق على تغيير تاريخك معك من قِبل شريك الموارد البشرية ({emp['hrbp_name']}) ومديرك.")
+            _hrbp_action(draft, emp, False)
+            return True
         pending = [s for s in ev["steps"] if s["status"] not in ("DONE", "DONE_LATE")][:1]
         for s in pending:
             _describe_step(draft, ev, s, emp)

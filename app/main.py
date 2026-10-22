@@ -129,7 +129,8 @@ def login(body: LoginIn, request: Request, response: Response):
 
 
 @app.post("/api/logout")
-def logout(response: Response, u: dict = Depends(auth.current_user)):
+def logout(request: Request, response: Response, u: dict = Depends(auth.current_user)):
+    auth.revoke(request.cookies.get(auth.COOKIE, ""))
     response.delete_cookie(auth.COOKIE, path="/")
     return {"ok": True}
 
