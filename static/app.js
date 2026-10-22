@@ -1006,7 +1006,10 @@ async function renderCaseHome() {
   const kinds = { EARLY_WARNING: L("Early warning", "إنذار مبكر"), EMPLOYEE_HANDOFF: L("Employee handoff", "تحويل من الموظف"), POLICY_QUESTION: L("Policy question", "سؤال سياسة") };
   const today = S.health.as_of; const dueNow = [...open, ...ack].filter((c) => c.next_update_due <= today).length;
   const first = (S.me.name || "").split(" ")[0];
-  const recent = [...open, ...ack].sort((a, b) => b.created_at.localeCompare(a.created_at)).slice(0, 5);
+  // employee handoffs first (a person asked for help), then the most recently raised or updated (DEF-058)
+  const touched = (c) => [c.created_at, ...(c.notes || []).map((n) => n.at)].sort().pop();
+  const recent = [...open, ...ack].sort((a, b) => (b.type === "EMPLOYEE_HANDOFF") - (a.type === "EMPLOYEE_HANDOFF")
+    || touched(b).localeCompare(touched(a))).slice(0, 5);
   $("#view").innerHTML = `${pageHead(L(`Welcome back, ${esc(first)}`, `أهلاً بعودتك، ${esc(first)}`), S.role === "hrbp" ? L("Cases for the employees you support, and where journeys are stalling.", "حالات الموظفين الذين تدعمهم، وأين تتعثر الرحلات.") : L("Cases where you are the named owner.", "الحالات التي أنت مسؤول عنها بالاسم."))}
   <div class="kpis">
     ${kpi(L("Open cases", "حالات مفتوحة"), open.length, L("waiting for an owner to act", "بانتظار تحرك المسؤول"), open.length ? "amber" : "green")}
