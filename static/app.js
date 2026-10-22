@@ -499,11 +499,13 @@ function actionDone(a) {
   const st = S.actState || { requests: [], cases: [] };
   if (a.type === "RAISE_REQUEST") { const q = st.requests.find((x) => x.key === a.request_key); return q ? q.request_id : null; }
   if (a.type === "ESCALATE") { const c = st.cases.find((x) => x.owner === a.owner?.name); return c ? c.case_id : null; }
+  if (a.type === "ASK_HUMAN") { const q = st.requests.find((x) => x.key === "HR_QUERY"); return q ? q.request_id : null; }
   return null;
 }
 function doneChip(a, ref) {
   const ar = S.lang === "ar"; const sp = document.createElement("span"); sp.className = "act-old done";
-  const what = a.type === "ESCALATE" ? (ar ? `تم التحويل إلى ${a.owner.name}` : `Handed to ${a.owner.name}`) : a.label;
+  const what = a.type === "ESCALATE" ? (ar ? `تم التحويل إلى ${a.owner.name}` : `Handed to ${a.owner.name}`)
+    : a.type === "ASK_HUMAN" ? (ar ? "تم إرسال سؤالك إلى عمليات الموارد البشرية" : "Sent to HR Operations") : a.label;
   sp.textContent = `✓ ${what} · ${ref}`; return sp;
 }
 function renderCtx(j) {
