@@ -1062,7 +1062,7 @@ function caseDetail(c, kinds) {
     ${c.policy.length ? `<p style="margin-top:12px">${c.policy.map((p) => `<button class="cite" data-cite="${p}">${p}</button>`).join(" ")}</p>` : ""}
     <div class="guard"><strong>${L("Shared by the employee:", "ما شاركه الموظف:")}</strong> ${c.shared_items.map(esc).join(", ")}.<br>
       ${L("Conversations are never shared. Check-in feedback appears only if the employee chose to include it. Not for use in performance, probation or disciplinary decisions.", "لا تتم مشاركة المحادثات أبداً. تظهر ملاحظات الاستطلاع فقط إذا اختار الموظف ذلك. لا يجوز استخدامها في قرارات الأداء أو التجربة أو التأديب.")} ${citeBtn("POL-PRV-001 §6.2")}</div>
-    ${c.notes.length ? `<h3 style="margin-top:14px">${L("Notes", "ملاحظات")}</h3><ul class="notes">${c.notes.map((n) => `<li>${esc(n.at.slice(0, 10))} · ${esc(n.by_name || (String(n.by).startsWith("employee:") ? `${c.employee_name} (employee)` : n.by))}: ${esc(n.text)}</li>`).join("")}</ul>` : ""}
+    ${c.notes.length ? `<h3 style="margin-top:14px">${L("Notes", "ملاحظات")}</h3><ul class="notes">${c.notes.map((n) => `<li>${esc(n.at.slice(0, 10))} · ${esc(n.by_name || (String(n.by).startsWith("employee:") ? "Rafiq (system)" : n.by))}: ${esc(n.text)}</li>`).join("")}</ul>` : ""}
     <label class="small" for="caseNote" style="display:block;margin-top:14px">${L("Note to the employee (optional)", "ملاحظة للموظف (اختياري)")}</label>
     <textarea id="caseNote" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:8px;min-height:60px"></textarea>
     <div class="acts">${c.status !== "ACKNOWLEDGED" && c.status !== "RESOLVED" ? `<button class="btn primary" data-status="ACKNOWLEDGED">${L("Acknowledge and take ownership", "الاستلام وتولي المسؤولية")}</button>` : ""}

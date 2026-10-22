@@ -235,7 +235,7 @@ def escalate(emp_id, ev, step_code=None, include_pulse=False, employee_note="", 
                      "linked_request": linked["request_id"] if linked else case.get("linked_request"),
                      "status": "OPEN", "joined_early_warning": True,
                      "next_update_due": (config.AS_OF + dt.timedelta(days=1)).isoformat()})
-        case.setdefault("notes", []).append({"at": state.now_iso(), "by": f"employee:{emp_id}", "by_name": f"{emp['first_name']} {emp['last_name']} (employee)",
+        case.setdefault("notes", []).append({"at": state.now_iso(), "by": "system", "by_name": "Rafiq (system)",
                                              "text": "The employee asked for help through Rafiq; this early warning is now their handoff."})
         state.save_case(case)
         state.audit(actor, "case_joined", emp_id, f"{case['case_id']} early warning -> employee handoff ({owner['name']})")
