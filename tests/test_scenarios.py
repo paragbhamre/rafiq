@@ -633,3 +633,14 @@ def test_s12_best_guess_handoff_carries_the_original_question():
     assert "not sure" in r["reply"].lower()
     q = next(a for a in r["actions"] if a["type"] == "ASK_HUMAN")["question"]
     assert "cat" in q
+
+
+def test_s13_no_visit_visa_workaround_and_travel_question_shows_blocker():
+    state.reset()
+    r = ask("EMP-1013", "Can I fly on a visit visa and work remotely there until the permit comes?")
+    assert r["reply"].startswith("**Please don't travel to work there yet") and "POL-MOB-002 §3.2" in cites(r)
+    assert "Sarah Whitfield" in {a["owner"]["name"] for a in primary_escalation(r)}
+    r = ask("EMP-1013", "My flight to Singapore is tomorrow, anything I should know?")
+    assert "isn't part of your journey" not in r["reply"] and "work permit" in r["reply"]
+    r = ask("EMP-1013", "I'm due to start in Singapore tomorrow. Am I good to go?")
+    assert "**Not yet**" in r["reply"]

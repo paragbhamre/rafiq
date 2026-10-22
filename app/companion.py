@@ -339,7 +339,7 @@ def _blocking_roots(ev, step):
 
 
 SELF_TRAVEL_RE = (r"book (my|a) (own )?(flight|ticket)|buy (my|a) (own )?(flight|ticket)|book (it )?myself|"
-                  r"(fly|travel|come|go) (anyway|without|first|on a visit)|visit visa|tourist visa|"
+                  r"(fly|travel|come|go) (anyway|without|first|on a visit)|visit visa|tourist visa|work remotely (there|from)|"
                   r"sort (the|my|out the|out my) (visa|paperwork)? ?(out )?(when|after) i (land|arrive|get there)")
 
 
@@ -349,6 +349,19 @@ def _self_travel_answer(draft, ev, emp):
     permit = steps.get("VISA_ISSUED") or steps.get("WORK_PERMIT_ISSUED")
     if not permit or permit["status"] in ("DONE", "DONE_LATE"):
         return False
+    if ev["journey_type"] == "MOBILITY":
+        draft.say("**Please don't travel to work there yet, including on a visit visa.** You must not work at the outstation "
+                  "without a valid work permit, and your move date is only confirmed once it is issued.",
+                  "**يرجى عدم السفر للعمل هناك الآن، ولو بتأشيرة زيارة.** لا يجوز العمل في المحطة الخارجية دون تصريح عمل ساري، "
+                  "ولا يتم تأكيد تاريخ انتقالك إلا بعد صدوره.")
+        for c in ("POL-MOB-002 §3.2", "POL-MOB-002 §5.1", "POL-MOB-002 §5.2"):
+            draft.policy_line(c, "• ", "• ")
+        draft.say(f"If your move date needs to change, it is agreed with you, both managers and your HR Business Partner "
+                  f"({emp['hrbp_name']}). Here's where your permit stands:",
+                  f"إذا احتاج تاريخ انتقالك إلى تغيير، يتم الاتفاق عليه معك ومع المديرين وشريك الموارد البشرية ({emp['hrbp_name']}). "
+                  "هذا وضع تصريحك:")
+        draft._self_travel = True
+        return True
     draft.say("**Please don't book or travel yet.** You need a valid entry permit before you travel, and the company "
               "books your joining ticket once it's issued, so there's nothing for you to pay or rebook.",
               "**يرجى عدم الحجز أو السفر الآن.** تحتاج إلى تصريح دخول ساري قبل السفر، وتحجز الشركة تذكرة التحاقك "
@@ -371,6 +384,9 @@ def compose_topic(draft, ev, emp, topic, codes):
         _maybe_compound(draft, ev, emp)
         return
     if not candidates:
+        if topic in ("ticket", "permit", "visa") and any(x["status"] in ("STALLED", "AT_RISK") for x in ev["steps"]):
+            draft.intent = "STATUS"
+            return compose_status(draft, ev, emp)
         return _not_applicable(draft, ev, emp, topic)
     candidates.sort(key=lambda s: (STATUS_ORDER.get(s["status"], 9), s["target_day"]))
     problem = [s for s in candidates if s["status"] in ("STALLED", "AT_RISK", "DUE_TODAY")]
@@ -872,6 +888,15 @@ def route(emp_id, msg, ui_lang="en"):
         status_q = re.search(STATUS_RE, low)
         steps = {s["code"]: s for s in ev["steps"]}
         topic_problem = any(steps.get(c, {}).get("status") in ("STALLED", "AT_RISK", "DUE_TODAY") for c in codes)
+        if re.search(SELF_TRAVEL_RE, low) and _self_travel_answer(draft, ev, emp):
+            draft.intent = "SELF_TRAVEL"
+            permit = next((x for x in ev["steps"] if x["code"] in ("VISA_ISSUED", "WORK_PERMIT_ISSUED")), None)
+            if permit:
+                draft.steps.append(permit["code"])
+                _describe_step(draft, ev, permit, emp)
+                _offer_step_actions(draft, ev, permit, emp)
+            _hrbp_action(draft, emp, False)
+            return draft, ev
         if status_q and re.search(r"good to go|all set|ready|can i (fly|travel|start|go)|جاهز", low):
             draft.intent = "STATUS"
             compose_status(draft, ev, emp)
