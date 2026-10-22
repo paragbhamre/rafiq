@@ -461,3 +461,8 @@ def test_s01_loan_device_request_arrives_complete_and_previews_first():
     r = client.post("/api/employee/EMP-1001/actions", json={"action": a, "note": "Induction is today"}, headers=H("employee", "EMP-1001"))
     req = r.json()["request"]
     assert "SR-00001" in req["description"] and "Location:" in req["description"] and "Induction is today" in req["description"]
+
+
+def test_page_and_script_are_revalidated_after_a_redeploy():
+    for path in ("/", "/static/app.js", "/static/app.css"):
+        assert client.get(path).headers.get("cache-control") == "no-cache", path

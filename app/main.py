@@ -35,6 +35,10 @@ async def _headers(request, call_next):
     resp.headers["Referrer-Policy"] = "same-origin"
     if request.url.path.startswith("/api/"):
         resp.headers["Cache-Control"] = "no-store"
+    else:
+        # page, script and styles: the browser always checks for a newer version (cheap 304 via ETag),
+        # so a redeploy reaches every open browser on the next reload
+        resp.headers["Cache-Control"] = "no-cache"
     return resp
 
 
