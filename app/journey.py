@@ -44,7 +44,7 @@ def _resolve_prereqs(step, applicable_codes):
     out = []
     for p in step["prereqs"]:
         chosen = next((o for o in p.split("|") if o in applicable_codes), None)
-        if chosen:
+        if chosen and chosen not in out:   # "B7 else B5" collapses to B5 on domestic moves: list it once (DEF-056)
             out.append(chosen)
     return out
 
