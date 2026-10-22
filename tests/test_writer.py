@@ -53,3 +53,17 @@ def test_writer_is_told_when_a_handoff_already_exists():
     _, _, journey, buttons = llm._context("EMP-1008", d, ev)
     assert any("Already handed to Omar Haddad" in x for x in journey["already_done"])
     assert not any("Omar Haddad" in b for b in buttons)
+
+
+def test_follow_up_replies_are_not_re_greeted(monkeypatch):
+    from app import companion, config, llm
+    from app.data import state
+    state.reset()
+    seen = []
+    monkeypatch.setattr(config, "LLM_PROVIDER", "anthropic")
+    monkeypatch.setattr(llm, "_anthropic", lambda system, msgs: (seen.append(system), "Dear Tariq,\n\nYour access step is late.")[1])
+    monkeypatch.setattr(llm, "validate", lambda text, allowed, draft: text)
+    first = companion.chat("EMP-1010", "I can't get into the DWC rostering system.")
+    second = companion.chat("EMP-1010", "I'm locked out of the system I need at my new site.", thread_id=first["thread_id"])
+    assert first["reply"].startswith("Dear Tariq")
+    assert not second["reply"].startswith("Dear") and "do NOT greet" in seen[-1]

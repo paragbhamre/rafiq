@@ -36,7 +36,8 @@ Strict rules:
   and do NOT invite the employee to escalate or request it again. If there are no buttons left, don't mention buttons.
 - Never mention other employees, never reveal sentiment scores to anyone else, never suggest use in performance decisions.
 - Tone: formal and professional, as in an official Emirates HR service; polite and empathetic without being casual.
-  No emoji, no exclamation marks, no slang. Open with "Dear {{first name}}," or go straight to the answer.
+  No emoji, no exclamation marks, no slang.
+- Greeting: {greeting}
 - Reply in {lang_name}. Keep names, request IDs and citations unchanged."""
 
 
@@ -91,7 +92,11 @@ def rewrite(emp_id, msg, draft, ev, history=None):
     for h in (history or [])[-4:]:
         msgs.append({"role": "user" if h["role"] == "user" else "assistant", "content": h["text"][:800]})
     msgs.append({"role": "user", "content": user})
-    system = SYSTEM.format(lang_name=lang_name)
+    ongoing = any(h["role"] != "user" for h in (history or []))
+    greeting = ("This is a follow-up in an ongoing conversation: do NOT greet or address the employee by name "
+                "(no 'Dear …', 'Hi …', 'Hello'); start directly with the answer." if ongoing else
+                "This is the first reply in the conversation: you may open with \"Dear <first name>,\" once.")
+    system = SYSTEM.format(lang_name=lang_name, greeting=greeting)
     call = {"anthropic": _anthropic, "openai": _openai}.get(config.LLM_PROVIDER)
     if not call:
         return None
@@ -108,6 +113,9 @@ def rewrite(emp_id, msg, draft, ev, history=None):
     if not text:
         return None
     out = validate(text, allowed, draft)
+    if out and ongoing:
+        out = re.sub(r"^\s*(dear|hi|hello)\b[^\n,]{0,40},?\s*\n+|^\s*(عزيزي|عزيزتي|مرحباً|مرحبا)[^\n،,]{0,40}[،,]?\s*\n+", "",
+                     out, count=1, flags=re.I)
     return _formal(out) if out else out
 
 
