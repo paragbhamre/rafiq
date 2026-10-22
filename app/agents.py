@@ -307,7 +307,10 @@ def update_case(case_id, status=None, note=None, actor="hrbp", actor_name=None, 
         c["status"] = status
     if status == "RESOLVED" and step_done and case_step(c):
         # The owner confirms the step itself is now complete: the employee's journey updates and dependants re-evaluate
-        state.add_completion(c["employee_id"], case_step(c), config.AS_OF.isoformat(), c.get("linked_request"))
+        req = c.get("linked_request") or next((x.get("request_id") for x in c.get("signals", [])
+                                               if x.get("request_id") and x.get("step") in (None, case_step(c))), None)
+        c["linked_request"] = req
+        state.add_completion(c["employee_id"], case_step(c), config.AS_OF.isoformat(), req)
         c["step_completed"] = case_step(c)
         c["notes"].append({"at": state.now_iso(), "by": actor, "by_name": actor_name or actor,
                            "text": "Resolved: step marked complete" + (f"; {c['linked_request']} closed" if c.get("linked_request") else "") + "."})
