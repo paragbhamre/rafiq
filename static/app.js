@@ -44,6 +44,7 @@ const t = (k, vars = {}) => { let s = (T[S.lang][k] ?? T.en[k] ?? k); if (typeof
 
 /* ------------------------------------------------------------------ helpers */
 const $ = (sel, el = document) => el.querySelector(sel);
+const yourWords = (x) => (x === "Employee's note" ? (S.lang === "ar" ? "ملاحظتك" : "Your note") : x);   // employee-facing wording
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 function headers() { return { "Content-Type": "application/json", "X-Rafiq-Request": "1" }; }
 async function api(path, opts = {}) {
@@ -892,8 +893,8 @@ async function confirmEscalation(a, btn) {
           : `This is already with **${c.owner.name}** (case **${c.case_id}**). Nothing new was sent.`, citations: [], actions: [], lang: S.lang });
         await refreshActionState(); return;
       }
-      addBot({ reply: (ar ? `تم التحويل إلى **${c.owner.name}** (${c.owner.role}). رقم الحالة **${c.case_id}**. ستتلقى تحديثاً بحلول ${c.next_update_due}. تمت مشاركة: ${c.shared_items.join("، ")}.`
-        : `Handed to **${c.owner.name}** (${c.owner.role}). Case **${c.case_id}**. You'll hear back by ${fmtDate(c.next_update_due)}. Shared: ${c.shared_items.join(", ")}.`), citations: [], actions: [], lang: S.lang });
+      addBot({ reply: (ar ? `تم التحويل إلى **${c.owner.name}** (${c.owner.role}). رقم الحالة **${c.case_id}**. ستتلقى تحديثاً بحلول ${c.next_update_due}. تمت مشاركة: ${c.shared_items.map(yourWords).join("، ")}.`
+        : `Handed to **${c.owner.name}** (${c.owner.role}). Case **${c.case_id}**. You'll hear back by ${fmtDate(c.next_update_due)}. Shared: ${c.shared_items.map(yourWords).join(", ")}.`), citations: [], actions: [], lang: S.lang });
       await refreshActionState(); refreshSide();
     } catch (e) { toast(e.message); $("#ok").disabled = false; }
   };
@@ -937,7 +938,7 @@ async function openMyData() {
     <div class="md-sec"><h3>${L("Signals Rafiq has flagged about you", "التنبيهات المسجلة عنك")}</h3>
       ${d.signals_about_me.length ? d.signals_about_me.map((s) => `<div class="sig ${s.level}">${esc(ar ? s.message_ar : s.message)}${s.sensitive ? ` <span class="small muted">(${L("only you see this", "تراه أنت فقط")})</span>` : ""}</div>`).join("") : `<p class="muted small">${L("None — you're on track.", "لا يوجد — رحلتك تسير وفق الخطة.")}</p>`}</div>
     <div class="md-sec"><h3>${L("Shared with others", "ما تمت مشاركته مع الآخرين")}</h3>
-      ${d.shared_with_others.length ? `<table><tr><th>${L("Case", "الحالة")}</th><th>${L("With", "مع")}</th><th>${L("What was shared", "ما تمت مشاركته")}</th></tr>${d.shared_with_others.map((c) => `<tr><td>${esc(c.case_id)}<br><span class="small muted">${esc(c.type.replace("_", " ").toLowerCase())}</span></td><td>${esc(c.owner.name)} (${esc(c.owner.role)})<br><span class="small muted">cc ${esc(c.hrbp)}</span></td><td>${c.shared_items.map(esc).join(", ")}</td></tr>`).join("")}</table>` : `<p class="muted small">${L("Nothing has been shared.", "لم تتم مشاركة أي شيء.")}</p>`}
+      ${d.shared_with_others.length ? `<table><tr><th>${L("Case", "الحالة")}</th><th>${L("With", "مع")}</th><th>${L("What was shared", "ما تمت مشاركته")}</th></tr>${d.shared_with_others.map((c) => `<tr><td>${esc(c.case_id)}<br><span class="small muted">${esc(c.type.replace("_", " ").toLowerCase())}</span></td><td>${esc(c.owner.name)} (${esc(c.owner.role)})<br><span class="small muted">cc ${esc(c.hrbp)}</span></td><td>${c.shared_items.map((x) => esc(yourWords(x))).join(", ")}</td></tr>`).join("")}</table>` : `<p class="muted small">${L("Nothing has been shared.", "لم تتم مشاركة أي شيء.")}</p>`}
       <p class="small muted" style="margin-top:6px">${L("Your manager sees journey step progress only.", "يرى مديرك تقدم خطوات الرحلة فقط.")} ${citeBtn("POL-PRV-001 §5.1")}</p></div>
     <div class="md-sec"><h3>${L("Your profile", "ملفك")}</h3><dl class="kv">${Object.entries(d.profile).filter(([, v]) => v).map(([k, v]) => `<dt>${esc(k.replaceAll("_", " "))}</dt><dd>${esc(v)}</dd>`).join("")}</dl></div>
     <div class="md-sec"><h3>${L("Conversation history", "سجل المحادثات")}</h3><p class="small">${d.conversation_messages} ${L("messages stored.", "رسالة محفوظة.")} ${esc(d.retention)}</p>
@@ -1061,7 +1062,7 @@ function caseDetail(c, kinds) {
     ${c.policy.length ? `<p style="margin-top:12px">${c.policy.map((p) => `<button class="cite" data-cite="${p}">${p}</button>`).join(" ")}</p>` : ""}
     <div class="guard"><strong>${L("Shared by the employee:", "ما شاركه الموظف:")}</strong> ${c.shared_items.map(esc).join(", ")}.<br>
       ${L("Conversations are never shared. Check-in feedback appears only if the employee chose to include it. Not for use in performance, probation or disciplinary decisions.", "لا تتم مشاركة المحادثات أبداً. تظهر ملاحظات الاستطلاع فقط إذا اختار الموظف ذلك. لا يجوز استخدامها في قرارات الأداء أو التجربة أو التأديب.")} ${citeBtn("POL-PRV-001 §6.2")}</div>
-    ${c.notes.length ? `<h3 style="margin-top:14px">${L("Notes", "ملاحظات")}</h3><ul class="notes">${c.notes.map((n) => `<li>${esc(n.at.slice(0, 10))} · ${esc(n.by)}: ${esc(n.text)}</li>`).join("")}</ul>` : ""}
+    ${c.notes.length ? `<h3 style="margin-top:14px">${L("Notes", "ملاحظات")}</h3><ul class="notes">${c.notes.map((n) => `<li>${esc(n.at.slice(0, 10))} · ${esc(n.by_name || (String(n.by).startsWith("employee:") ? `${c.employee_name} (employee)` : n.by))}: ${esc(n.text)}</li>`).join("")}</ul>` : ""}
     <label class="small" for="caseNote" style="display:block;margin-top:14px">${L("Note to the employee (optional)", "ملاحظة للموظف (اختياري)")}</label>
     <textarea id="caseNote" style="width:100%;border:1px solid var(--line);border-radius:6px;padding:8px;min-height:60px"></textarea>
     <div class="acts">${c.status !== "ACKNOWLEDGED" && c.status !== "RESOLVED" ? `<button class="btn primary" data-status="ACKNOWLEDGED">${L("Acknowledge and take ownership", "الاستلام وتولي المسؤولية")}</button>` : ""}

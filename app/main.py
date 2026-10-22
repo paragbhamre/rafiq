@@ -394,7 +394,7 @@ def update_case(case_id: str, body: CaseIn, u: dict = Depends(auth.current_user)
         raise HTTPException(404, "Case not found in your scope")
     if body.status and body.status not in ("OPEN", "ACKNOWLEDGED", "RESOLVED"):
         raise HTTPException(400, "Bad status")
-    return agents.update_case(case_id, body.status, body.note, actor=_actor(u))
+    return agents.update_case(case_id, body.status, body.note, actor=_actor(u), actor_name=u.get("name"))
 
 
 # --------------------------------------------------------------------------

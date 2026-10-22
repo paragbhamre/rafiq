@@ -175,7 +175,7 @@ def escalate(emp_id, ev, step_code=None, include_pulse=False, employee_note="", 
     ops = [s for s in rel if not s.get("sensitive")]
     shared = ["Journey step status", "Service request status"]
     if employee_note:
-        shared.append("Your note")
+        shared.append("Employee's note")
     pulse_lines = []
     if include_pulse:
         pulse_lines = [f"Check-in {p['submitted_at'][:10]}: score {p['score']}/5 — \"{p['comment']}\""
@@ -216,7 +216,8 @@ def escalate(emp_id, ev, step_code=None, include_pulse=False, employee_note="", 
             summary += (f" Linked request {linked['request_id']} ({linked['status']}, open {linked.get('days_open')} days, "
                         f"owner {linked['owner_name']}) {verb} to HIGH priority.")
     if employee_note:
-        summary += f" Employee's note: \"{employee_note}\"."
+        note = employee_note.strip()
+        summary += f" Employee's note: \"{note}\"" + ("" if note[-1:] in ".!?؟" else ".")
     if pulse_lines:
         summary += " Shared with consent: " + " | ".join(pulse_lines)
     warning = open_early_warning_for(emp_id, owner["name"])
@@ -234,7 +235,7 @@ def escalate(emp_id, ev, step_code=None, include_pulse=False, employee_note="", 
                      "linked_request": linked["request_id"] if linked else case.get("linked_request"),
                      "status": "OPEN", "joined_early_warning": True,
                      "next_update_due": (config.AS_OF + dt.timedelta(days=1)).isoformat()})
-        case.setdefault("notes", []).append({"at": state.now_iso(), "by": f"employee:{emp_id}",
+        case.setdefault("notes", []).append({"at": state.now_iso(), "by": f"employee:{emp_id}", "by_name": f"{emp['first_name']} {emp['last_name']} (employee)",
                                              "text": "The employee asked for help through Rafiq; this early warning is now their handoff."})
         state.save_case(case)
         state.audit(actor, "case_joined", emp_id, f"{case['case_id']} early warning -> employee handoff ({owner['name']})")
@@ -266,14 +267,14 @@ def _set_priority(request_id, priority):
     state.set_priority(request_id, priority)
 
 
-def update_case(case_id, status=None, note=None, actor="hrbp"):
+def update_case(case_id, status=None, note=None, actor="hrbp", actor_name=None):
     c = state.get_case(case_id)
     if not c:
         return None
     if status:
         c["status"] = status
     if note:
-        c["notes"].append({"at": state.now_iso(), "by": actor, "text": note})
+        c["notes"].append({"at": state.now_iso(), "by": actor, "by_name": actor_name or actor, "text": note})
     state.save_case(c)
     state.audit(actor, "case_updated", c["employee_id"], f"{case_id} status={status} note={bool(note)}")
     if status in ("ACKNOWLEDGED", "RESOLVED"):
