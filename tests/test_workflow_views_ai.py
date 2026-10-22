@@ -34,7 +34,7 @@ def act(emp, action, preview=False, **kw):
 
 def owner_login(name):
     """Username of a named owner (service owner or HRBP) from their display name."""
-    for u in auth.directory.users():
+    for u in (auth.directory.users.values() if isinstance(auth.directory.users, dict) else auth.directory.users()):
         if u.get("name") == name and u.get("role") in ("owner", "hrbp"):
             return u["username"]
     raise AssertionError(f"no login for {name}")

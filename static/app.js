@@ -88,7 +88,7 @@ function citeBtn(ref) {
   return c ? `<button class="cite" data-cite="${esc(c)}">${esc(c)}</button>` : "";
 }
 function setLang(lang, user = false) {
-  if (user) S.langChosen = true;
+  if (user) { S.langChosen = true; try { localStorage.setItem("rafiq.lang", lang); } catch (e) { /* storage blocked: choice lasts this visit */ } }
   S.lang = lang; document.documentElement.lang = lang; document.documentElement.dir = lang === "ar" ? "rtl" : "ltr";
   $("#langBtn").textContent = lang === "ar" ? "English" : "العربية";
   document.querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); });
@@ -99,7 +99,10 @@ async function boot() {
   S.health = await fetch("/api/health").then((r) => r.json());
   const params = new URLSearchParams(location.search);
   S.homeStyle = params.get("home") === "full" ? "full" : "window";  // Home shows a five-step window of the route
-  setLang(params.get("lang") === "ar" ? "ar" : "en");
+  let saved = null; try { saved = localStorage.getItem("rafiq.lang"); } catch (e) { saved = null; }
+  if (params.get("lang") === "ar" || params.get("lang") === "en") setLang(params.get("lang"), true);   // deep link wins (I18N-09)
+  else if (saved === "ar" || saved === "en") { setLang(saved); S.langChosen = true; }                 // last choice persists (I18N-08)
+  else setLang("en");
   $("#langBtn").addEventListener("click", () => { setLang(S.lang === "en" ? "ar" : "en", true); renderBanner(); if (S.chatEl) { S.chatEl.remove(); S.chatEl = null; } S.me ? (renderChrome(), render()) : showLogin(); });
   $("#logoutBtn").addEventListener("click", async () => { await api("/api/logout", { method: "POST" }).catch(() => {}); S.me = null; S.chatEl = null; showLogin(); });
   document.addEventListener("click", (e) => { const c = e.target.closest(".cite"); if (c) showCite(c.dataset.cite); });
@@ -110,6 +113,12 @@ async function boot() {
 function renderBanner() {
   $("#banner").innerHTML = `<span>${t("banner", { asof: S.health.as_of })}</span>`;
 }
+// Owner roles in Arabic (I18N-07); unknown roles from another pack fall back to the English title
+const OWNER_ROLE_AR = { "Facilities Manager": "مدير المرافق", "Global Mobility Lead": "رئيس فريق التنقل الوظيفي",
+  "HR Business Partner": "شريك الموارد البشرية", "IT Service Delivery Manager": "مدير تقديم خدمات تقنية المعلومات",
+  "L&D Manager": "مدير التعلم والتطوير", "PRO Team Lead": "رئيس فريق العلاقات الحكومية", "Payroll Manager": "مدير الرواتب",
+  "Recruiter": "مسؤول التوظيف", "Security Duty Manager": "مدير الأمن المناوب", "HR Operations": "عمليات الموارد البشرية" };
+const roleName = (r) => (S.lang === "ar" && OWNER_ROLE_AR[r]) || r;
 const ROLE_LABEL = { employee: ["Employee", "موظف"], manager: ["Manager", "مدير"], hrbp: ["HR partner", "شريك الموارد البشرية"], owner: ["Service owner", "مالك الخدمة"], admin: ["Admin", "المسؤول"] };
 const ICON = {
   home: '<path d="M3.5 10.5 12 4l8.5 6.5V20a1 1 0 0 1-1 1H15v-6H9v6H4.5a1 1 0 0 1-1-1z"/>',
@@ -866,7 +875,8 @@ async function confirmEscalation(a, btn) {
     catch (e) { return null; }
   };
   const box = (p) => p ? `<div class="share-box"><strong>${ar ? `هذا ما سيستلمه ${esc(a.owner.name)}:` : `This is what ${esc(a.owner.name)} will receive:`}</strong>
-        <p style="margin:8px 0 4px"><strong>${esc(p.title)}</strong></p><p style="margin:0 0 8px">${esc(p.summary)}</p>
+        ${ar ? `<p class="small muted" style="margin:6px 0 0">النص المرسل كما هو (بالإنجليزية):</p>` : ""}
+        <div lang="en" dir="ltr"><p style="margin:8px 0 4px"><strong>${esc(p.title)}</strong></p><p style="margin:0 0 8px">${esc(p.summary)}</p></div>
         ${p.policy.length ? `<p class="small muted">${ar ? "السياسات" : "Policy"}: ${p.policy.map((c) => esc(c.cite || c)).join(", ")}</p>` : ""}
         <p class="small muted">${ar ? "تحديث متوقع بحلول" : "Next update due"}: ${fmtDate(p.next_update_due)}</p>
         <p class="small muted" style="margin-top:8px">${ar ? "لن تتم مشاركة: محادثاتك مع رفيق" + (p.not_shared.length > 1 ? "، وإجاباتك على استبيان المتابعة" : "") : "Not shared: " + p.not_shared.join(", ").replace("Your check", "your check")}.</p>
@@ -878,7 +888,7 @@ async function confirmEscalation(a, btn) {
   $("#dlgInner").innerHTML = `
     <div class="dlg-h"><h2>${t("share_title", { name: esc(a.owner.name) })}</h2></div>
     <div class="dlg-b">
-      <p class="muted">${esc(a.owner.role)}${S.journey.employee.hrbp_name && a.owner.role !== "HR Business Partner" ? ` · ${ar ? "مع إشعار" : "cc"} ${esc(S.journey.employee.hrbp_name)}` : ""}</p>
+      <p class="muted">${esc(roleName(a.owner.role))}${S.journey.employee.hrbp_name && a.owner.role !== "HR Business Partner" ? ` · ${ar ? "مع إشعار" : "cc"} ${esc(S.journey.employee.hrbp_name)}` : ""}</p>
       ${shareBox}
       ${consent ? `<label class="check"><input type="checkbox" id="incPulse"> <span>${t("include_pulse")}</span></label>` : ""}
       <label class="small" for="note" style="display:block;margin-top:12px">${t("note")}</label>
@@ -899,7 +909,7 @@ async function confirmEscalation(a, btn) {
           : `This is already with **${c.owner.name}** (case **${c.case_id}**). Nothing new was sent.`, citations: [], actions: [], lang: S.lang });
         await refreshActionState(); return;
       }
-      addBot({ reply: (ar ? `تم التحويل إلى **${c.owner.name}** (${c.owner.role}). رقم الحالة **${c.case_id}**. ستتلقى تحديثاً بحلول ${c.next_update_due}. تمت مشاركة: ${c.shared_items.map(yourWords).join("، ")}.`
+      addBot({ reply: (ar ? `تم التحويل إلى **${c.owner.name}** (${roleName(c.owner.role)}). رقم الحالة **${c.case_id}**. ستتلقى تحديثاً بحلول ${c.next_update_due}. تمت مشاركة: ${c.shared_items.map(yourWords).join("، ")}.`
         : `Handed to **${c.owner.name}** (${c.owner.role}). Case **${c.case_id}**. You'll hear back by ${fmtDate(c.next_update_due)}. Shared: ${c.shared_items.map(yourWords).join(", ")}.`), citations: [], actions: [], lang: S.lang });
       await refreshActionState(); refreshSide();
     } catch (e) { toast(e.message); $("#ok").disabled = false; }
@@ -947,7 +957,7 @@ async function openMyData() {
     <div class="md-sec"><h3>${L("Signals Rafiq has flagged about you", "التنبيهات المسجلة عنك")}</h3>
       ${d.signals_about_me.length ? d.signals_about_me.map((s) => `<div class="sig ${s.level}">${esc(ar ? s.message_ar : s.message)}${s.sensitive ? ` <span class="small muted">(${L("only you see this", "تراه أنت فقط")})</span>` : ""}</div>`).join("") : `<p class="muted small">${L("None — you're on track.", "لا يوجد — رحلتك تسير وفق الخطة.")}</p>`}</div>
     <div class="md-sec"><h3>${L("Shared with others", "ما تمت مشاركته مع الآخرين")}</h3>
-      ${d.shared_with_others.length ? `<table><tr><th>${L("Case", "الحالة")}</th><th>${L("With", "مع")}</th><th>${L("What was shared", "ما تمت مشاركته")}</th></tr>${d.shared_with_others.map((c) => `<tr><td>${esc(c.case_id)}<br><span class="small muted">${esc(c.type.replace("_", " ").toLowerCase())}</span></td><td>${esc(c.owner.name)} (${esc(c.owner.role)})<br><span class="small muted">cc ${esc(c.hrbp)}</span></td><td>${c.shared_items.map((x) => esc(yourWords(x))).join(", ")}</td></tr>`).join("")}</table>` : `<p class="muted small">${L("Nothing has been shared.", "لم تتم مشاركة أي شيء.")}</p>`}
+      ${d.shared_with_others.length ? `<table><tr><th>${L("Case", "الحالة")}</th><th>${L("With", "مع")}</th><th>${L("What was shared", "ما تمت مشاركته")}</th></tr>${d.shared_with_others.map((c) => `<tr><td>${esc(c.case_id)}<br><span class="small muted">${esc(c.type.replace("_", " ").toLowerCase())}</span></td><td>${esc(c.owner.name)} (${esc(roleName(c.owner.role))})<br><span class="small muted">cc ${esc(c.hrbp)}</span></td><td>${c.shared_items.map((x) => esc(yourWords(x))).join(", ")}</td></tr>`).join("")}</table>` : `<p class="muted small">${L("Nothing has been shared.", "لم تتم مشاركة أي شيء.")}</p>`}
       <p class="small muted" style="margin-top:6px">${L("Your manager sees journey step progress only.", "يرى مديرك تقدم خطوات الرحلة فقط.")} ${citeBtn("POL-PRV-001 §5.1")}</p></div>
     <div class="md-sec"><h3>${L("Your profile", "ملفك")}</h3><dl class="kv">${Object.entries(d.profile).filter(([, v]) => v).map(([k, v]) => `<dt>${esc(k.replaceAll("_", " "))}</dt><dd>${esc(v)}</dd>`).join("")}</dl></div>
     <div class="md-sec"><h3>${L("Conversation history", "سجل المحادثات")}</h3><p class="small">${d.conversation_messages} ${L("messages stored.", "رسالة محفوظة.")} ${esc(d.retention)}</p>
@@ -1063,7 +1073,7 @@ function caseDetail(c, kinds) {
   return `<div class="panel-h"><div><h2>${esc(c.title)}</h2><p class="small muted">${esc(c.case_id)} · ${kinds[c.type]} · ${esc(c.created_at.slice(0, 10))} · ${esc(c.status)}</p></div></div>
   <div class="panel-b">
     <dl class="kv"><dt>${L("Employee", "الموظف")}</dt><dd>${esc(c.employee_name)} (${esc(c.employee_id)})</dd>
-      <dt>${L("Named owner", "المسؤول")}</dt><dd><strong>${esc(c.owner.name)}</strong>, ${esc(c.owner.role)}</dd>
+      <dt>${L("Named owner", "المسؤول")}</dt><dd><strong>${esc(c.owner.name)}</strong>, ${esc(roleName(c.owner.role))}</dd>
       <dt>HRBP</dt><dd>${esc(c.hrbp.name)}</dd><dt>${L("Next update due", "موعد التحديث")}</dt><dd>${fmtDate(c.next_update_due)}${dueTag(c)}</dd>
       ${c.linked_request ? `<dt>${L("Linked request", "الطلب المرتبط")}</dt><dd>${esc(c.linked_request)}</dd>` : ""}</dl>
     <h3 style="margin-top:14px">${L("Summary", "الملخص")}</h3><p style="margin-top:4px">${esc(c.summary)}</p>

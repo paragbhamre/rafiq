@@ -37,8 +37,10 @@ docker run -p 8000:8000 --env-file .env rafiq
 ```bash
 pip install -r requirements.txt
 uvicorn app.main:app --port 8000
-python -m pytest -q          # all 65 tests, including the pack swap rehearsal (run before every push)
-python -m pytest -q -m "not slow"   # the 57 the Render build runs (a few seconds)
+python -m pytest -q          # everything: scenarios, responsible AI, workflow, views, AI writer, i18n, ops,
+                             # pack swap rehearsal and the browser suite (run before every push)
+python -m pytest -q -m "not slow"   # the fast subset the Render build runs (under a minute)
+pip install playwright && python -m pytest -q -m slow tests/test_browser.py   # browser checks: RTL, phone width, keyboard, labels
 DATABASE_URL=postgresql://user@host/db python -m pytest -q   # same suite against Postgres
 ```
 
