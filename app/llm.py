@@ -97,7 +97,7 @@ def rewrite(emp_id, msg, draft, ev, history=None):
     for h in (history or [])[-4:]:
         msgs.append({"role": "user" if h["role"] == "user" else "assistant", "content": h["text"][:800]})
     msgs.append({"role": "user", "content": user})
-    ongoing = any(h["role"] != "user" for h in (history or []))
+    ongoing = True   # the chat already opens with Rafiq's welcome ("Hi Aisha…"), so replies never add a salutation
     greeting = ("This is a follow-up in an ongoing conversation: do NOT greet or address the employee by name "
                 "(no 'Dear …', 'Hi …', 'Hello'); start directly with the answer." if ongoing else
                 "This is the first reply in the conversation: you may open once with a salutation IN THE REPLY LANGUAGE "

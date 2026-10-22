@@ -65,8 +65,9 @@ def test_follow_up_replies_are_not_re_greeted(monkeypatch):
     monkeypatch.setattr(llm, "validate", lambda text, allowed, draft: text)
     first = companion.chat("EMP-1010", "I can't get into the DWC rostering system.")
     second = companion.chat("EMP-1010", "I'm locked out of the system I need at my new site.", thread_id=first["thread_id"])
-    assert first["reply"].startswith("Dear Tariq")
-    assert not second["reply"].startswith("Dear") and "do NOT greet" in seen[-1]
+    # the chat opens with Rafiq's own welcome, so no reply adds a salutation (not even the first)
+    assert not first["reply"].startswith("Dear") and not second["reply"].startswith("Dear")
+    assert "do NOT greet" in seen[0] and "do NOT greet" in seen[-1]
 
 
 def test_arabic_reply_never_opens_in_english_and_sent_question_is_known(monkeypatch):
