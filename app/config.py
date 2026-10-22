@@ -83,7 +83,9 @@ OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
 OPENAI_MODEL = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
 OPENAI_API_STYLE = os.getenv("OPENAI_API_STYLE", "openai")  # "openai" or "azure"
-LLM_TIMEOUT_S = float(os.getenv("LLM_TIMEOUT_S", "25"))
+LLM_TIMEOUT_S = float(os.getenv("LLM_TIMEOUT_S", "12"))
+# Whole AI-writer call, after which the grounded draft is shown instead (keeps a live demo responsive)
+LLM_DEADLINE_S = float(os.getenv("LLM_DEADLINE_S", "12"))
 LLM_MAX_TOKENS = int(os.getenv("LLM_MAX_TOKENS", "3000"))
 
 # Runtime state storage: PostgreSQL when DATABASE_URL is set (Render Postgres / Azure PostgreSQL), else a local JSON file

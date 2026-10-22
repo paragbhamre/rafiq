@@ -21,3 +21,16 @@ def test_bullets_with_real_content_are_kept():
 def test_arabic_echo_is_removed():
     out = drop_button_echo("يمكنك الاختيار:\n- طلب جهاز مؤقت", ["طلب جهاز مؤقت"])
     assert out == "يمكنك الاختيار."
+
+
+def test_slow_writer_falls_back_to_the_grounded_draft_within_the_deadline(monkeypatch):
+    # NFR-01 / DEF-019: a slow AI provider must not keep the employee waiting
+    import time
+    from app import companion, config, llm
+    monkeypatch.setattr(config, "LLM_PROVIDER", "anthropic")
+    monkeypatch.setattr(config, "LLM_DEADLINE_S", 1.0)
+    monkeypatch.setattr(llm, "_anthropic", lambda system, msgs: (time.sleep(5), "late text")[1])
+    t0 = time.time()
+    r = companion.chat("EMP-1001", "It's my first week and I still don't have a laptop. What do I do?")
+    assert time.time() - t0 < 3
+    assert r["mode"] == "offline_fallback" and "Laptop and phone issued" in r["reply"]

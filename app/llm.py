@@ -5,6 +5,7 @@ The model only rewrites a grounded draft; it does not decide routing or take act
 Only non-sensitive facts are sent, plus pulse data when the employee has opted in.
 Use providers whose terms exclude training on and retention of submitted data.
 """
+import concurrent.futures
 import json
 import logging
 import re
@@ -53,6 +54,9 @@ def _context(emp_id, draft, ev):
     return allowed, sections, journey, actions
 
 
+_POOL = concurrent.futures.ThreadPoolExecutor(max_workers=8, thread_name_prefix="writer")
+
+
 def rewrite(emp_id, msg, draft, ev, history=None):
     allowed, sections, journey, actions = _context(emp_id, draft, ev)
     lang_name = "Arabic (Modern Standard, friendly)" if draft.lang == "ar" else "English (UK)"
@@ -65,13 +69,16 @@ def rewrite(emp_id, msg, draft, ev, history=None):
         msgs.append({"role": "user" if h["role"] == "user" else "assistant", "content": h["text"][:800]})
     msgs.append({"role": "user", "content": user})
     system = SYSTEM.format(lang_name=lang_name)
+    call = {"anthropic": _anthropic, "openai": _openai}.get(config.LLM_PROVIDER)
+    if not call:
+        return None
+    # Hard deadline for the whole call: past it, the employee gets the grounded draft straight away.
+    fut = _POOL.submit(call, system, msgs)
     try:
-        if config.LLM_PROVIDER == "anthropic":
-            text = _anthropic(system, msgs)
-        elif config.LLM_PROVIDER == "openai":
-            text = _openai(system, msgs)
-        else:
-            return None
+        text = fut.result(timeout=config.LLM_DEADLINE_S)
+    except concurrent.futures.TimeoutError:
+        log.warning("llm fallback: deadline %.0fs", config.LLM_DEADLINE_S)
+        return None
     except Exception as exc:  # noqa: BLE001 - any provider failure falls back to the deterministic draft
         log.warning("llm fallback: %s", type(exc).__name__)
         return None

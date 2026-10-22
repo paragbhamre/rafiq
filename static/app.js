@@ -47,7 +47,15 @@ const $ = (sel, el = document) => el.querySelector(sel);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 function headers() { return { "Content-Type": "application/json", "X-Rafiq-Request": "1" }; }
 async function api(path, opts = {}) {
-  const r = await fetch(path, { credentials: "same-origin", headers: headers(), ...opts });
+  // never leave the page waiting forever (e.g. a dropped connection during a redeploy)
+  const ctl = new AbortController(); const timer = setTimeout(() => ctl.abort(), opts.timeoutMs || 30000);
+  let r;
+  try { r = await fetch(path, { credentials: "same-origin", headers: headers(), signal: ctl.signal, ...opts }); }
+  catch (e) {
+    throw new Error(e.name === "AbortError"
+      ? (S.lang === "ar" ? "يستغرق الأمر وقتاً أطول من المعتاد. يرجى المحاولة مرة أخرى." : "This is taking longer than usual. Please try again.")
+      : (S.lang === "ar" ? "تعذّر الاتصال. يرجى المحاولة مرة أخرى." : "Couldn't connect. Please try again."));
+  } finally { clearTimeout(timer); }
   if (r.status === 401 && !path.startsWith("/api/login")) { S.me = null; showLogin(); throw new Error("Please sign in."); }
   if (!r.ok) { const e = await r.json().catch(() => ({})); throw new Error(e.detail || `Request failed (${r.status})`); }
   return r.json();
