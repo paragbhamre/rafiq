@@ -105,5 +105,5 @@ Every step listed here is a candidate for a hidden test scenario. The rules engi
 | Payroll Manager | Fatima Al Zarooni | payroll.mgr@example.test |
 | L&D Manager | Daniel Okafor | ld.mgr@example.test |
 | Security Duty Manager | Rashid Al Ketbi | security.duty@example.test |
-| Recruiter | Assigned per employee | ta@example.test |
+| Recruiter | Reem Al Hashimi | ta.lead@example.test |
 | HR Business Partner | Assigned per employee (`employees.hrbp_name`) | hrbp@example.test |

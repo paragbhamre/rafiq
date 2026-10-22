@@ -160,7 +160,7 @@ ESCALATION_CONTACTS = {
     "Payroll Manager": ("Fatima Al Zarooni", "payroll.mgr@example.test"),
     "L&D Manager": ("Daniel Okafor", "ld.mgr@example.test"),
     "Security Duty Manager": ("Rashid Al Ketbi", "security.duty@example.test"),
-    "Recruiter": ("Talent Acquisition desk", "ta@example.test"),
+    "Recruiter": ("Reem Al Hashimi", "ta.lead@example.test"),
 }
 
 # Service-request routing for actions the companion can start (POL-SRV-001 §2)

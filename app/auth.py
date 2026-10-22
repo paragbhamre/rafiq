@@ -176,8 +176,6 @@ class Directory:
         for hid, name in sorted(pack.hrbps.items()):
             add("hr." + _slug(*name.replace("Al ", "Al").split(" ", 1)), role="hrbp", id=hid, name=name)
         for role, (name, _c) in config.ESCALATION_CONTACTS.items():
-            if role == "Recruiter":
-                continue
             add("owner." + _slug(*name.replace("Al ", "Al").split(" ", 1)), role="owner", id=name, name=name, title=role)
         if ADMIN_PASSWORD:
             add("admin", role="admin", id="admin", name="Demo administrator")
