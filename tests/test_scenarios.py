@@ -63,7 +63,7 @@ def test_s01_day5_no_laptop():
 
 def test_s02_visa_stalled_before_joining():
     r = ask("EMP-1002", "Is my visa on track? I'm meant to fly next week.")
-    assert {"POL-PRO-001 §6.2", "POL-PRO-001 §6.3"} <= cites(r)
+    assert {"POL-PRO-001 §6.2", "POL-PRO-001 §6.3", "POL-TRV-001 §4.1"} <= cites(r)
     assert "Khalid Al Mansoori" in {a["owner"]["name"] for a in primary_escalation(r)}
     assert "late" in r["reply"]
 
