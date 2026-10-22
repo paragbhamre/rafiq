@@ -743,6 +743,10 @@ async function send() {
   $("#suggest")?.classList.add("hidden");  // suggestions help you start; once you're talking they step aside
   try {
     const r = await api(`/api/employee/${S.user}/chat`, { method: "POST", body: JSON.stringify({ message: text, lang: S.lang, thread_id: S.threadId || null }) });
+    if (r.redacted_message) {  // the server removed bank or card details: show the stored version, not what was typed
+      const mine = document.querySelectorAll("#msgs .msg.me"); const last = mine[mine.length - 1];
+      if (last) last.textContent = r.redacted_message;
+    }
     addBot({ ...r, stream: true });
     S.threadId = r.thread_id;
   }

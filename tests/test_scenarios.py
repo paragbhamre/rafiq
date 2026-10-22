@@ -510,3 +510,23 @@ def test_s02_paraphrase_paperwork_is_the_visa():
     r = ask("EMP-1002", "My family and I are supposed to arrive soon. What's holding up the paperwork?")
     assert "Visa medical fitness test completed" in r["reply"] and "can't match" not in r["reply"]
     assert "Khalid Al Mansoori" in {a["owner"]["name"] for a in primary_escalation(r)}
+
+
+def test_s03_bank_details_are_removed_and_never_stored():
+    # SCN-S03-02 / PRV-15: account numbers never reach history, the AI writer or the reply
+    import json
+    state.reset()
+    r = ask("EMP-1003", "Here are my UK bank details: sort code 12-34-56, account 12345678.")
+    assert r["intent"] == "SENSITIVE_DATA" and r["redacted_message"]
+    assert "12345678" not in r["redacted_message"] and "12-34-56" not in r["redacted_message"]
+    assert "SR-00003" in r["reply"] and "HR service portal" in r["reply"] and "POL-ALW-001 §6.2" in cites(r)
+    blob = json.dumps(client.get(f"/api/employee/EMP-1003/threads/{r['thread_id']}", headers=H("employee", "EMP-1003")).json())
+    assert "sort code [removed]" in blob
+    assert "12345678" not in blob and "12-34-56" not in blob
+
+
+def test_ordinary_numbers_are_not_redacted():
+    from app.companion import redact_sensitive
+    for m in ("I move on 25-10-26 and SR-00003 is open", "My account still is not working",
+              "Booked 12 Oct, open 16 days, AED 25,000", "My employee ID is EMP-1003"):
+        assert redact_sensitive(m) == (m, False), m

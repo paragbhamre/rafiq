@@ -832,19 +832,61 @@ def render(draft):
     return "\n\n".join(draft.lines)
 
 
+# Financial identifiers the employee might paste. They are removed before the message is routed, stored,
+# shown in history or sent to the AI writer; the companion then points to the secure route.
+SENSITIVE_PATTERNS = [  # order matters: labelled numbers first, then bare IBANs and long digit runs
+    (re.compile(r"(?i)\b(sort code|account(?: number| no\.?)?|acct|a/c|iban|swift|bic|routing(?: number)?|card(?: number)?)"
+                r"(\s*(?:is|:|#|-)?\s*)(?=[A-Z0-9 -]*\d)[A-Z0-9][A-Z0-9 -]{4,}[A-Z0-9]"), r"\1 [removed]"),
+    (re.compile(r"\b[A-Z]{2}\d{2}(?: ?[A-Z0-9]{4}){3,7}(?: ?[A-Z0-9]{1,4})?\b"), "[removed]"),
+    (re.compile(r"(?<![\w-])(?:\d[ -]?){12,18}\d(?![\w-])"), "[removed]"),
+]
+
+
+def redact_sensitive(msg):
+    out = msg
+    for rx, rep in SENSITIVE_PATTERNS:
+        out = rx.sub(rep, out)
+    return out, out != msg
+
+
+def compose_sensitive(draft, ev, emp):
+    draft.intent = "SENSITIVE_DATA"
+    draft.say("**Please don't share bank details in this chat.** I've removed them, so they aren't stored here or "
+              "passed on to anyone.",
+              "**يرجى عدم مشاركة بيانات حسابك البنكي في هذه المحادثة.** لقد حذفتها، فلن يتم حفظها هنا أو تمريرها لأي أحد.")
+    req = next((q for q in ev["requests"] if q["status"] == "PENDING_INFO"
+                and re.search(r"bank|account|iban", q.get("description", ""), re.I)), None)
+    if req:
+        draft.say(f"To get them to {req['owner_team']} securely, submit them through the **HR service portal** on "
+                  f"request **{req['request_id']}** ({req['subject']}), as {req['owner_name']} asked.",
+                  f"لإرسالها إلى {req['owner_team']} بشكل آمن، قدّمها عبر **بوابة خدمات الموارد البشرية** على الطلب "
+                  f"**{req['request_id']}**.")
+    else:
+        draft.say("If Payroll needs them, submit them through the **HR service portal**.",
+                  "إذا احتاجها فريق الرواتب، قدّمها عبر **بوابة خدمات الموارد البشرية**.")
+    draft.policy_line("POL-ALW-001 §6.2", "• ", "• ")
+
+
 def chat(emp_id, msg, ui_lang="en", thread_id=None):
     """One turn in the employee's conversation. Rafiq keeps one continuous conversation per employee
     (started on the first message); the AI writer sees its recent history."""
     msg = (msg or "").strip()[:1500]
+    msg, redacted = redact_sensitive(msg)
     if thread_id and not state.thread_get(emp_id, thread_id):
         thread_id = None
     if not thread_id:  # one continuous conversation per employee: continue the latest
         latest = state.threads(emp_id)
         thread_id = latest[0]["id"] if latest else None
-    draft, ev = route(emp_id, msg, ui_lang)
+    if redacted:
+        ev = evaluate(emp_id)
+        draft = Draft("ar" if has_arabic(msg) or ui_lang == "ar" else "en")
+        draft._msg = msg.lower()
+        compose_sensitive(draft, ev, pack.employees[emp_id])
+    else:
+        draft, ev = route(emp_id, msg, ui_lang)
     text = render(draft)
     mode = "offline"
-    if config.LLM_PROVIDER != "offline" and not draft.refused:
+    if config.LLM_PROVIDER != "offline" and not draft.refused and not redacted:
         written = llm.rewrite(emp_id, msg, draft, ev, history=_history(emp_id, thread_id) if thread_id else [])
         if written:
             text, mode = written, "ai"
@@ -856,7 +898,8 @@ def chat(emp_id, msg, ui_lang="en", thread_id=None):
         thread_id = state.thread_create(emp_id, _title(draft, ev, msg))
     out = {"reply": text, "lang": draft.lang, "intent": draft.intent, "citations": cites, "actions": draft.actions,
            "refused": draft.refused, "unsure": draft.unsure, "steps": draft.steps, "mode": mode,
-           "overall": ev["overall"], "thread_id": thread_id, "new_thread": new}
+           "overall": ev["overall"], "thread_id": thread_id, "new_thread": new,
+           "redacted_message": msg if redacted else None}
     _remember(emp_id, msg, out)
     return out
 
