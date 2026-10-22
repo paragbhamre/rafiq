@@ -56,13 +56,14 @@ def _context(emp_id, draft, ev):
     if usable_pulse(emp_id):  # opt-in only
         journey["employee_checkins"] = [{"date": p["submitted_at"][:10], "score": p["score"]} for p in usable_pulse(emp_id)][-2:]
     from .agents import open_handoff, open_request
+    from .companion import _fmt_date
     actions, done = [], []
     for a in draft.actions:
         c = open_handoff(emp_id, a["owner"]["name"]) if a["type"] == "ESCALATE" and a.get("owner") else None
         r = (open_request(emp_id, a.get("request_key")) if a["type"] == "RAISE_REQUEST"
              else open_request(emp_id, "HR_QUERY") if a["type"] == "ASK_HUMAN" else None)
         if c:
-            done.append(f"Already handed to {a['owner']['name']} (case {c['case_id']}, next update {c['next_update_due']})")
+            done.append(f"Already handed to {a['owner']['name']} (case {c['case_id']}, next update {_fmt_date(c['next_update_due'], draft.lang == 'ar')})")
         elif r:
             done.append(f"Already requested: {a['label']} ({r['request_id']})")
         else:
