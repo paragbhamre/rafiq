@@ -178,14 +178,21 @@ def escalate(emp_id, ev, step_code=None, include_pulse=False, employee_note="", 
     existing = open_handoff(emp_id, target["name"])
     if existing and not preview:  # one open handoff per owner; show the case that's already with them
         return {**existing, "duplicate": True}
-    if step:
+    late = [x for x in ev["steps"] if x["status"] in ("STALLED", "AT_RISK")]
+    if target.get("role") == "HR Business Partner" and (step is None or len(late) > 1):
+        # The HRBP pulls everything together, so the case carries every off-track item, not just one step
+        owner = target
+        ops = [s for s in ev["signals"] if not s.get("sensitive")]
+        if len(late) > 1:
+            title = "Several items off track: " + ", ".join(x["label"] for x in late[:3])
+            policy = list(dict.fromkeys(p for x in late[:3] for p in x["policy"][:2]))[:4]
+        else:
+            title = "Employee asked for help: several items off track"
+            policy = ["POL-SRV-001 §3.2", "POL-PRV-001 §5.2"]
+    else:
         owner = step["escalation"]
         title = f"{step['label']} — {step['status'].replace('_', ' ').lower()}"
         policy = step["policy"]
-    else:
-        owner = escalation_owner("HR Business Partner", emp)
-        title = "Employee asked for help: several items off track"
-        policy = ["POL-SRV-001 §3.2", "POL-PRV-001 §5.2"]
     linked = next((q for q in ev["requests"] if q.get("linked_event_code") == step_code and
                    q["status"] not in ("RESOLVED", "CLOSED")), None) if step_code else None
     if linked and not preview:

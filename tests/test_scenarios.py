@@ -570,3 +570,13 @@ def test_s05_hrbp_preview_matches_the_case_with_and_without_feedback():
         assert c["summary"] == p["summary"], include
         assert ("Shared with consent" in c["summary"]) is include
         assert ("Your check-in (pulse) answers" in p["not_shared"]) is (not include)
+
+
+def test_s05_hrbp_handoff_carries_every_off_track_item():
+    # SCN-S05-01: the HRBP "pulls things together", so the case lists all late steps, not just the buddy
+    state.reset()
+    c = client.post("/api/employee/EMP-1005/actions", json={"action": {"type": "ESCALATE", "step": "BUDDY_ASSIGNED"}},
+                    headers=H("employee", "EMP-1005")).json()["case"]
+    assert c["owner"]["name"] == "Claire Dupont" and c["title"].startswith("Several items off track")
+    assert "Onboarding buddy" in c["summary"] and "Corporate induction" in c["summary"]
+    assert "score" not in c["summary"]
