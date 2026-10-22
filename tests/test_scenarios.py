@@ -444,3 +444,20 @@ def test_actions_are_never_triggered_twice():
     st = client.get(f"/api/employee/{emp}/action-state", headers=h).json()
     assert any(q["key"] == "IT_LOAN_DEVICE" for q in st["requests"]) and any(c["owner"] == "Priya Raman" for c in st["cases"])
     assert client.get(f"/api/employee/{emp}/action-state", headers=H("employee", "EMP-1002")).status_code == 403
+
+
+def test_s01_loan_device_request_arrives_complete_and_previews_first():
+    # SCN-S01-02: the employee sees exactly what IT receives before anything is raised
+    state.reset()  # earlier tests raise a loan device too; start clean so this one isn't a duplicate
+    a = {"type": "RAISE_REQUEST", "request_key": "IT_LOAN_DEVICE", "step": "IT_KIT_ISSUED"}
+    before = len(state.requests_for("EMP-1001"))
+    p = client.post("/api/employee/EMP-1001/actions", json={"action": a, "preview": True}, headers=H("employee", "EMP-1001"))
+    assert p.status_code == 200 and p.json()["kind"] == "preview"
+    assert len(state.requests_for("EMP-1001")) == before          # preview raises nothing
+    det = {d["label"]: d["value"] for d in p.json()["preview"]["details"]}
+    assert "EMP-1001" in det["Employee"] and "Garhoud" in det["Location"]
+    assert "Laptop and phone issued" in det["Reason"] and "SR-00001" in det["Related requests"]
+    assert det["Policy"] == "POL-IT-001 §5.1"
+    r = client.post("/api/employee/EMP-1001/actions", json={"action": a, "note": "Induction is today"}, headers=H("employee", "EMP-1001"))
+    req = r.json()["request"]
+    assert "SR-00001" in req["description"] and "Location:" in req["description"] and "Induction is today" in req["description"]

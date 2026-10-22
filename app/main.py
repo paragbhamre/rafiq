@@ -153,6 +153,35 @@ class ActionIn(BaseModel):
     action: dict
     include_pulse: bool = False
     note: str = ""
+    preview: bool = False   # RAISE_REQUEST: return the pre-filled request without raising it
+
+
+def _request_details(emp_id, ev, key, step):
+    """Everything the receiving team needs, so the request arrives complete (who, where, what, why, links)."""
+    emp = pack.employees[emp_id]
+    spec = config.REQUEST_TYPES[key]
+    anchor = "Joining date" if ev["journey_type"] == "ONBOARDING" else "Move requested"
+    rows = [
+        ("Employee", f"{emp['first_name']} {emp['last_name']} ({emp_id})"),
+        ("Role", " · ".join(x for x in (emp.get("role_title"), emp.get("department"), emp.get("grade")) if x)),
+        ("Location", emp.get("location") or "-"),
+        ("Line manager", emp.get("manager_name") or "-"),
+        ("Journey", f"{ev['stage_label']}, day {ev['journey_day']} ({anchor} {ev['anchor_date']})"),
+    ]
+    if ev.get("move_effective_date"):
+        rows.append(("Move effective", ev["move_effective_date"]))
+    if step:
+        late = f", {step['days_late']} days late" if step.get("days_late") else ""
+        rows.append(("Reason", f"{step['label']}: {step['status'].replace('_', ' ').lower()} (target {step['target_date']}{late})"))
+        linked = [q for q in ev["requests"] if q.get("linked_event_code") == step["code"]
+                  and q["status"] not in ("RESOLVED", "CLOSED") and q.get("request_key") != key]
+        if linked:
+            rows.append(("Related requests", "; ".join(f"{q['request_id']} ({q['subject']}, {q['owner_name']}, "
+                                                      f"open {q['days_open']} days)" for q in linked)))
+    rows.append(("Policy", spec["policy"]))
+    rows.append(("Service level", f"{spec['sla']:g} working day{'s' if spec['sla'] != 1 else ''}"))
+    return {"to": spec["team"], "subject": spec["label"], "subject_ar": spec["label_ar"],
+            "request_type": spec["request_type"], "details": [{"label": k, "value": v} for k, v in rows]}
 
 
 class ConsentIn(BaseModel):
@@ -232,12 +261,13 @@ def run_action(emp_id: str, body: ActionIn, u: dict = Depends(require_self)):
         if key not in config.REQUEST_TYPES:
             raise HTTPException(400, "Unknown request type")
         step = next((s for s in ev["steps"] if s["code"] == a.get("step")), None)
-        subject = config.REQUEST_TYPES[key]["label"]
-        desc = f"Raised from the companion. Journey: {ev['stage_label']}, day {ev['journey_day']}."
-        if step:
-            desc += f" Step '{step['label']}' status {step['status']} (target {step['target_date']})."
+        det = _request_details(emp_id, ev, key, step)
+        if body.preview:
+            return {"ok": True, "kind": "preview", "preview": det}
+        subject = det["subject"]
+        desc = "Raised by the employee from the companion.\n" + "\n".join(f"{d['label']}: {d['value']}" for d in det["details"])
         if body.note:
-            desc += f" Employee note: {body.note}"
+            desc += f"\nEmployee note: {body.note.strip()[:400]}"
         res = agents.raise_request(emp_id, key, subject, desc, a.get("step"), actor=f"employee:{emp_id}")
         return {"ok": True, "kind": "request", **res}
     if t == "ESCALATE":

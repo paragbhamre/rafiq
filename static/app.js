@@ -753,6 +753,7 @@ async function send() {
 async function doAction(a, btn) {
   if (a.type === "OPEN_MY_DATA") return openMyData();
   if (a.type === "ESCALATE") return confirmEscalation(a, btn);
+  if (a.type === "RAISE_REQUEST") return confirmRequest(a, btn);
   btn.disabled = true;
   try {
     const r = await api(`/api/employee/${S.user}/actions`, { method: "POST", body: JSON.stringify({ action: a }) });
@@ -761,6 +762,41 @@ async function doAction(a, btn) {
     addBot({ reply: r.duplicate ? `${ar ? r.agent_reply_ar : r.agent_reply}` : `**${esc(r.agent)}** — ${ar ? r.agent_reply_ar : r.agent_reply}\n\n${ar ? `رقم الطلب ${req.request_id}.` : `Request ${req.request_id} raised.`}`, citations: [], actions: [], lang: S.lang });
     await refreshActionState(); refreshSide();
   } catch (e) { toast(e.message); btn.disabled = false; }
+}
+
+// Requests: show the pre-filled request (exactly what the team receives) before anything is raised
+const REQ_LABEL_AR = { "Employee": "الموظف", "Role": "الوظيفة", "Location": "الموقع", "Line manager": "المدير المباشر",
+  "Journey": "الرحلة", "Move effective": "سريان الانتقال", "Reason": "السبب", "Related requests": "طلبات مرتبطة",
+  "Policy": "السياسة", "Service level": "مستوى الخدمة" };
+async function confirmRequest(a, btn) {
+  const ar = S.lang === "ar";
+  let p;
+  try {
+    p = (await api(`/api/employee/${S.user}/actions`, { method: "POST", body: JSON.stringify({ action: a, preview: true }) })).preview;
+  } catch (e) { toast(e.message); return; }
+  $("#dlgInner").innerHTML = `
+    <div class="dlg-h"><h2>${ar ? `إرسال هذا الطلب إلى ${esc(p.to)}؟` : `Send this request to ${esc(p.to)}?`}</h2></div>
+    <div class="dlg-b">
+      <p class="muted">${esc(ar ? p.subject_ar : p.subject)}</p>
+      <div class="share-box"><strong>${ar ? "هذا ما سيستلمه الفريق:" : "This is what the team will receive:"}</strong>
+        <ul>${p.details.map((d) => `<li><strong>${esc(ar ? (REQ_LABEL_AR[d.label] || d.label) : d.label)}:</strong> ${esc(d.value)}</li>`).join("")}</ul>
+        <p class="small muted" style="margin-top:8px">${t("share_never")}</p></div>
+      <label class="small" for="note" style="display:block;margin-top:12px">${t("note")}</label>
+      <textarea id="note" maxlength="400"></textarea>
+    </div>
+    <div class="dlg-f"><button class="btn" id="cx">${t("cancel")}</button><button class="btn primary" id="ok">${ar ? "إرسال الطلب" : "Send request"}</button></div>`;
+  const dlg = $("#dlg"); dlg.className = ""; dlg.showModal();
+  $("#cx").onclick = () => dlg.close();
+  $("#ok").onclick = async () => {
+    $("#ok").disabled = true; btn.disabled = true;
+    try {
+      const r = await api(`/api/employee/${S.user}/actions`, { method: "POST", body: JSON.stringify({ action: a, note: $("#note").value }) });
+      dlg.close();
+      const req = r.request;
+      addBot({ reply: r.duplicate ? `${ar ? r.agent_reply_ar : r.agent_reply}` : `**${esc(r.agent)}** — ${ar ? r.agent_reply_ar : r.agent_reply}\n\n${ar ? `رقم الطلب ${req.request_id}.` : `Request ${req.request_id} raised.`}`, citations: [], actions: [], lang: S.lang });
+      await refreshActionState(); refreshSide();
+    } catch (e) { toast(e.message); $("#ok").disabled = false; btn.disabled = false; }
+  };
 }
 
 function confirmEscalation(a, btn) {
