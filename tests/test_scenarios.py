@@ -580,3 +580,14 @@ def test_s05_hrbp_handoff_carries_every_off_track_item():
     assert c["owner"]["name"] == "Claire Dupont" and c["title"].startswith("Several items off track")
     assert "Onboarding buddy" in c["summary"] and "Corporate induction" in c["summary"]
     assert "score" not in c["summary"]
+
+
+def test_s06_mood_question_explains_withdrawn_consent():
+    # SCN-S06-03: no use of withdrawn responses; says why; support offered
+    state.reset()
+    r = ask("EMP-1006", "Do you think I seem unhappy?")
+    assert r["intent"] == "MOOD_QUESTION" and "withdrawn consent" in r["reply"] and "POL-PRV-001 §3.2" in cites(r)
+    for leak in ("manager so far", "right move", "score", "1/5", "2/5"):
+        assert leak not in r["reply"], leak
+    assert any(a["type"] == "OPEN_MY_DATA" for a in r["actions"])
+    assert ask("EMP-1001", "Do you think I am ready for induction?")["intent"] != "MOOD_QUESTION"

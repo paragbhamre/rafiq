@@ -14,7 +14,7 @@ import datetime as dt
 import re
 
 from . import config, llm
-from .data import pack, state, usable_pulse
+from .data import consent_active, pack, state, usable_pulse
 from .journey import evaluate, step_def
 from .policies import has_arabic, library, tokenize
 
@@ -54,6 +54,10 @@ REQUEST_CATEGORY = {"FACILITIES": r"facilit|parking|maintenance|مرافق", "IT
                     "PAYROLL": r"payroll|allowance|salary|رواتب", "PRO": r"\bpro\b|visa|emirates id|تأشيرة",
                     "HR": r"\bhr\b|letter", "SECURITY": r"security|staff id|pass", "MOBILITY": r"mobility|relocat|permit",
                     "LEARNING": r"training|learning|induction|course"}
+MOOD_RE = (r"(do|does) (you|rafiq) think i('m| am| seem| look| sound) (\w+ )?(unhappy|happy|sad|upset|stressed|ok|okay|fine|"
+           r"struggling|frustrated|down|anxious|worried|negative|positive|annoyed|angry|disengaged)\b|how do i (seem|come across|sound)|"
+           r"am i (unhappy|happy|ok|okay|doing ok)\b.*\?|what do you know about (how i feel|my mood|my feelings)|"
+           r"\bmy (mood|sentiment|feelings)\b.*\?|هل تعتقد أنني|هل أبدو")
 ON_BEHALF_RE = (r"\b(message|email|e-mail|contact|chase|ping|call|text|remind|nudge|tell|ask|push|hurry)\b"
                 r"[^.?!]{0,30}\b(manager|boss|supervisor|hr|recruiter|payroll|it|team lead|him|her|them)\b|"
                 r"\bchase (him|her|them|it|this) up\b|\bon my behalf\b")
@@ -694,6 +698,29 @@ def _mentions_other_employee(msg, emp_id):
     return False
 
 
+def compose_mood(draft, ev, emp):
+    """'Do you think I seem unhappy?' -> say exactly what Rafiq does and doesn't use about feelings."""
+    draft.intent = "MOOD_QUESTION"
+    if not consent_active(emp["employee_id"]):
+        draft.say("I don't make judgements about how you're feeling. You've withdrawn consent for your check-in answers, "
+                  "so I don't use them for anything, and they're deleted within 30 days.",
+                  "لا أُصدر أحكاماً على مشاعرك. لقد سحبت موافقتك على إجابات استبيان المتابعة، لذلك لا أستخدمها لأي غرض، "
+                  "وتُحذف خلال 30 يوماً.")
+        draft.policy_line("POL-PRV-001 §3.2", "• ", "• ")
+        draft.policy_line("POL-PRV-001 §3.3", "• ", "• ")
+    else:
+        draft.say("I don't make judgements about how you're feeling. I only use the check-in answers you've chosen to share, "
+                  "to make sure nothing is stuck for you, and only you can see them unless you choose to share them.",
+                  "لا أُصدر أحكاماً على مشاعرك. أستخدم فقط إجابات الاستبيان التي اخترت مشاركتها، ولا يراها غيرك إلا إذا اخترت ذلك.")
+        draft.policy_line("POL-PRV-001 §5.1", "• ", "• ")
+    draft.say(f"If something's on your mind, your HR Business Partner, {emp['hrbp_name']}, is there to talk it through. "
+              "You can see everything I hold about you under **My data**.",
+              f"إذا كان هناك ما يشغلك، فشريك الموارد البشرية {emp['hrbp_name']} متاح للحديث معك. "
+              "يمكنك رؤية كل ما أحتفظ به عنك في **بياناتي**.")
+    _hrbp_action(draft, emp, False)
+    draft.action({"id": "my-data", "type": "OPEN_MY_DATA", "label": draft.t("Open My data", "فتح بياناتي")})
+
+
 def compose_on_behalf(draft, ev, emp):
     """'Can you message my manager and chase him?' -> Rafiq doesn't contact people for the employee;
     it hands the follow-up to the named owner whose job it is."""
@@ -763,6 +790,9 @@ def route(emp_id, msg, ui_lang="en"):
     if re.search(PRIVACY_RE, low) and not re.search(r"objective", low):
         draft.intent = "PRIVACY"
         compose_privacy(draft, ev, emp)
+        return draft, ev
+    if re.search(MOOD_RE, low):
+        compose_mood(draft, ev, emp)
         return draft, ev
     if re.search(ON_BEHALF_RE, low) and re.search(ON_BEHALF_ASK_RE, low.strip()):
         compose_on_behalf(draft, ev, emp)
