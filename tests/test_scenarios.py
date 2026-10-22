@@ -530,3 +530,14 @@ def test_ordinary_numbers_are_not_redacted():
     for m in ("I move on 25-10-26 and SR-00003 is open", "My account still is not working",
               "Booked 12 Oct, open 16 days, AED 25,000", "My employee ID is EMP-1003"):
         assert redact_sensitive(m) == (m, False), m
+
+
+def test_s04_rafiq_does_not_chase_the_manager_itself():
+    # SCN-S04-02 / G4: decline acting on the employee's behalf; route the follow-up to the named owner
+    state.reset()
+    r = ask("EMP-1004", "Can you message my new manager and chase him?")
+    assert r["intent"] == "DECLINED_ON_BEHALF" and "can't message or chase people for you" in r["reply"]
+    assert "Shaikha Al Mazrouei" in {a["owner"]["name"] for a in primary_escalation(r)}
+    assert "POL-MOB-001 §4.1" in cites(r)
+    for q in ("Can you tell me my housing allowance?", "Can IT give me a loan laptop?", "Who is my manager?"):
+        assert ask("EMP-1007" if "housing" in q else "EMP-1001", q)["intent"] != "DECLINED_ON_BEHALF", q

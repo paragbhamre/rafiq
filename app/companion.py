@@ -54,6 +54,10 @@ REQUEST_CATEGORY = {"FACILITIES": r"facilit|parking|maintenance|مرافق", "IT
                     "PAYROLL": r"payroll|allowance|salary|رواتب", "PRO": r"\bpro\b|visa|emirates id|تأشيرة",
                     "HR": r"\bhr\b|letter", "SECURITY": r"security|staff id|pass", "MOBILITY": r"mobility|relocat|permit",
                     "LEARNING": r"training|learning|induction|course"}
+ON_BEHALF_RE = (r"\b(message|email|e-mail|contact|chase|ping|call|text|remind|nudge|tell|ask|push|hurry)\b"
+                r"[^.?!]{0,30}\b(manager|boss|supervisor|hr|recruiter|payroll|it|team lead|him|her|them)\b|"
+                r"\bchase (him|her|them|it|this) up\b|\bon my behalf\b")
+ON_BEHALF_ASK_RE = r"^(can|could|would|will|please|pls)\b|\bfor me\b|\bon my behalf\b"
 OTHER_DATA_WORDS = r"score|feedback|pulse|data|record|salary|request|survey|comment|status"
 
 STATUS_ORDER = {"STALLED": 0, "AT_RISK": 1, "DUE_TODAY": 2, "WAITING": 3, "UPCOMING": 4, "DONE_LATE": 5, "DONE": 6}
@@ -678,6 +682,27 @@ def _mentions_other_employee(msg, emp_id):
     return False
 
 
+def compose_on_behalf(draft, ev, emp):
+    """'Can you message my manager and chase him?' -> Rafiq doesn't contact people for the employee;
+    it hands the follow-up to the named owner whose job it is."""
+    draft.intent = "DECLINED_ON_BEHALF"
+    draft.say("I can't message or chase people for you. I don't contact your manager or colleagues on your behalf. "
+              "What I can do is hand it to the person whose job it is to follow up:",
+              "لا يمكنني مراسلة الأشخاص أو متابعتهم نيابة عنك، ولا أتواصل مع مديرك أو زملائك. "
+              "ما يمكنني فعله هو تحويل الأمر إلى الشخص المسؤول عن المتابعة:")
+    problems = sorted([s for s in ev["steps"] if s["status"] in ("STALLED", "AT_RISK")],
+                      key=lambda s: (STATUS_ORDER[s["status"]], s["target_day"]))
+    if problems:
+        s0 = problems[0]
+        draft.steps.append(s0["code"])
+        _describe_step(draft, ev, s0, emp, detail=False)
+        _step_policy(draft, s0, max_lines=1)
+        _escalate_action(draft, s0, primary=True)
+    else:
+        _hrbp_action(draft, emp, len(usable_pulse(emp["employee_id"])) > 0)
+    draft.policy_line("POL-PRV-001 §6.1", "• ", "• ")
+
+
 def guardrails(draft, msg, emp):
     if re.search(BYPASS_RE, msg, re.I) or _mentions_other_employee(msg, emp["employee_id"]):
         draft.refused = True
@@ -726,6 +751,9 @@ def route(emp_id, msg, ui_lang="en"):
     if re.search(PRIVACY_RE, low) and not re.search(r"objective", low):
         draft.intent = "PRIVACY"
         compose_privacy(draft, ev, emp)
+        return draft, ev
+    if re.search(ON_BEHALF_RE, low) and re.search(ON_BEHALF_ASK_RE, low.strip()):
+        compose_on_behalf(draft, ev, emp)
         return draft, ev
     if re.search(HUMAN_RE, low):
         draft.intent = "HANDOFF"
