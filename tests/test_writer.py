@@ -67,3 +67,17 @@ def test_follow_up_replies_are_not_re_greeted(monkeypatch):
     second = companion.chat("EMP-1010", "I'm locked out of the system I need at my new site.", thread_id=first["thread_id"])
     assert first["reply"].startswith("Dear Tariq")
     assert not second["reply"].startswith("Dear") and "do NOT greet" in seen[-1]
+
+
+def test_arabic_reply_never_opens_in_english_and_sent_question_is_known(monkeypatch):
+    from app import agents, companion, config, llm
+    from app.data import state
+    state.reset()
+    agents.ask_human("EMP-1012", "Can I bring my cat?")
+    monkeypatch.setattr(config, "LLM_PROVIDER", "anthropic")
+    monkeypatch.setattr(llm, "_anthropic", lambda system, msgs: "Dear Liam,\n\nلست متأكداً.")
+    monkeypatch.setattr(llm, "validate", lambda text, allowed, draft: text)
+    r = companion.chat("EMP-1012", "هل يمكنني إحضار قطتي على رحلة الالتحاق، وهل ستدفع الشركة تكاليفها؟")
+    assert not r["reply"].startswith("Dear")
+    d, ev = companion.route("EMP-1012", "هل يمكنني إحضار قطتي على رحلة الالتحاق؟")
+    assert any("Already requested" in x for x in llm._context("EMP-1012", d, ev)[2]["already_done"])
