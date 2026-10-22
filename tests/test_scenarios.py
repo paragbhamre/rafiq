@@ -615,3 +615,11 @@ def test_status_leads_with_the_root_cause():
     # DEF-008 in chat: Aisha's status answer leads with the laptop, not network access
     r = ask("EMP-1001", "Am I behind on anything?")
     assert r["reply"].index("Laptop and phone issued") < r["reply"].index("Network, email")
+
+
+def test_s11_arabic_privacy_question():
+    # SCN-S11-03: Arabic privacy question gets the privacy answer in Arabic, not a policy search
+    state.reset()
+    r = ask("EMP-1011", "هل يستطيع مديري رؤية محادثاتي؟", lang="ar")
+    assert r["intent"] == "PRIVACY" and r["lang"] == "ar" and "POL-PRV-001 §5.1" in cites(r)
+    assert ask("EMP-1011", "من يستطيع رؤية بياناتي؟", lang="ar")["reply"].startswith("أنت فقط")

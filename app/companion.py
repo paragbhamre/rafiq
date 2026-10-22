@@ -41,7 +41,9 @@ TOPICS = [
 ]
 STATUS_RE = r"what.?s next|next step|how am i doing|on track|status|am i (behind|late|missing|overdue)|(is|are) (anything|something|there anything) (late|overdue|outstanding|missing|behind)|anything (i.?m|i am) (behind|missing)|do i need to do anything|(is|are) there anything (i need|to do|pending|outstanding)|anything pending|أنا متأخر|هل هناك شيء متأخر|what.?s happening|where am i|good to go|all set|am i ready|progress|update|can i (fly|travel|start|go)|ماذا بعد|الخطوة التالية|خطواتي|التالية|وضعي|رحلتي|جاهز"
 PRIVACY_RE = (r"manager (see|know|read)|who can see|my data|privacy|confidential|affect my (probation|performance|review)|"
-              r"used against|performance (review|decision)|will (it|this) affect|يرى مديري|خصوصي|بياناتي|التجربة")
+              r"used against|performance (review|decision)|will (it|this) affect|see my (chat|conversation|messages|data)|"
+              r"يرى مديري|مديري.{0,15}(رؤية|يرى|يطلع|يعرف|يقرأ)|(رؤية|يرى|يطلع على|يقرأ).{0,10}(محادثات|رسائل|بيانات)|"
+              r"من يستطيع رؤية|من يرى|خصوصي|بياناتي|التجربة|الأداء")
 HUMAN_RE = r"talk to (a |an )?(human|person|someone|real)|speak (to|with) (hr|someone|a person)|escalate|contact my hrbp|أريد التحدث"
 EMOTION_RE = r"\blost\b|frustrat|stress|unhappy|struggl|honestly|overwhelm|worried|anxious|upset|nobody|no one|محبط|قلق"
 SMALLTALK_RE = r"^(hi|hello|hey|good (morning|afternoon|evening)|salam|marhaba|thanks|thank you|cheers|مرحبا|مرحباً|السلام عليكم|شكرا|شكراً)\b[!. ]*$"
@@ -593,8 +595,13 @@ def compose_status(draft, ev, emp, greeting=False):
 
 
 def compose_privacy(draft, ev, emp):
-    draft.say("Short answer: **no** — your manager can't see what you tell me, and it can't be used in your probation or performance.",
-              "الإجابة المختصرة: **لا** — لا يستطيع مديرك رؤية ما تخبرني به، ولا يمكن استخدامه في تقييم فترة التجربة أو الأداء.")
+    if re.search(r"^\s*(who|what|which|من |ما |ماذا)", draft._msg):  # "who can see my data?" is not a yes/no question
+        draft.say("Only you can see your conversations with me. Your manager sees your journey step progress only, "
+                  "and nothing you tell me can be used in your probation or performance.",
+                  "أنت فقط من يرى محادثاتك معي. يرى مديرك تقدّم خطوات رحلتك فقط، ولا يمكن استخدام ما تخبرني به في تقييم فترة التجربة أو الأداء.")
+    else:
+        draft.say("Short answer: **no** — your manager can't see what you tell me, and it can't be used in your probation or performance.",
+                  "الإجابة المختصرة: **لا** — لا يستطيع مديرك رؤية ما تخبرني به، ولا يمكن استخدامه في تقييم فترة التجربة أو الأداء.")
     for c in ("POL-PRV-001 §5.1", "POL-PRV-001 §6.2", "POL-ONB-002 §4.2"):
         draft.policy_line(c, "• ", "• ")
     draft.say("Your HR Business Partner only sees a summary when you (or a stalled step) trigger a handoff, and you're told what's shared. "
